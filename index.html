@@ -249,7 +249,7 @@ function parseDay(s){const m=String(s).match(/(\d+)/);return m?parseInt(m[1]):1;
 async function fetchAT(){
   setLoading(true);
   try{
-    const r=await fetch(`https://api.airtable.com/v0/${BASE_ID}/${encodeURIComponent(TABLE_NAME)}?pageSize=100`,{headers:{'Authorization':`Bearer ${token}`}});
+    const r=await fetch(`https://api.airtable.com/v0/${BASE_ID}/${encodeURIComponent(TABLE_NAME)}?pageSize=100`,{headers:{'Authorization':`Bearer ${API_TOKEN}`}});
     if(!r.ok){const e=await r.json().catch(()=>({}));throw new Error(e.error?.message||`HTTP ${r.status}`);}
     const d=await r.json();
     EVENTS=d.records.map((r,i)=>({
