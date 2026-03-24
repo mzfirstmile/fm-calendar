@@ -166,6 +166,7 @@
   <div class="header-right">
     <div class="sync-pill live" id="syncPill" style="display:none"><div class="sync-dot"></div><span>Live</span></div>
     <button class="btn accent" onclick="refreshData()" style="display:none" id="refreshBtn">↻ Refresh</button>
+    <a class="btn" href="FM Manage.html" id="manageBtn" style="display:none">Manage Data</a>
     <a class="btn" href="https://airtable.com/app27jUbqonTIiHXY" target="_blank" id="editBtn" style="display:none">Edit in Airtable</a>
     <div class="view-toggle">
       <button class="active" onclick="setView('calendar')">Calendar</button>
@@ -274,7 +275,7 @@ async function fetchAT(){
 function buildClrs(){colorMap={};colorIdx=0;COLORS={};[...new Set(EVENTS.map(e=>e.property))].sort().forEach(p=>{const c=getClr(p);COLORS[p]={bg:hexA(c,.15),fg:c,border:c};});}
 
 // ── Setup ──
-function showUI(){['progArea','refreshBtn','editBtn','syncPill'].forEach(id=>document.getElementById(id).style.display='');}
+function showUI(){['progArea','refreshBtn','editBtn','manageBtn','syncPill'].forEach(id=>document.getElementById(id).style.display='');}
 async function refreshData(){const ok=await fetchAT();if(ok){activeFilters=new Set(Object.keys(COLORS));buildFilters();render();}}
 
 // ── Checks (Airtable-backed) ──
