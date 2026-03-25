@@ -85,12 +85,14 @@
   .period-nav button { width:32px; height:32px; border-radius:50%; border:1px solid var(--border); background:var(--surface); cursor:pointer; font-size:16px; color:var(--text-dim); display:flex; align-items:center; justify-content:center; transition:all .15s; }
   .period-nav button:hover { background:var(--surface2); color:var(--text); }
 
-  /* Summary Cards */
-  .summary-grid { display:grid; grid-template-columns:repeat(4,1fr); gap:16px; margin-bottom:28px; }
+  /* Summary Cards — 2 rows of 3 */
+  .summary-grid { display:grid; grid-template-columns:repeat(3,1fr); gap:16px; margin-bottom:28px; }
   .summary-card { background:var(--surface); border:1px solid var(--border); border-radius:12px; padding:20px; text-align:center; }
   .summary-card .value { font-size:24px; font-weight:700; margin-bottom:4px; }
   .summary-card .value.green { color:var(--green-dark); }
   .summary-card .value.red { color:var(--red-dark); }
+  .summary-card .value.orange { color:var(--orange); }
+  .summary-row-label { grid-column:1/-1; font-size:11px; font-weight:600; color:var(--text-dim); text-transform:uppercase; letter-spacing:.5px; padding:4px 0 0; }
   .summary-card .label { font-size:11px; font-weight:600; color:var(--text-dim); text-transform:uppercase; letter-spacing:.5px; }
 
   /* ── Category Sections ── */
@@ -351,11 +353,14 @@
     </div>
   </div>
 
-  <!-- Summary Cards -->
+  <!-- Summary Cards — Row 1: Income, OpEx, Net Income -->
   <div class="summary-grid" id="summaryGrid">
     <div class="summary-card"><div class="value green" id="totalIncome">—</div><div class="label">Income</div></div>
     <div class="summary-card"><div class="value red" id="totalExpenses">—</div><div class="label">Operating Expenses</div></div>
     <div class="summary-card"><div class="value" id="netIncome">—</div><div class="label">Net Income</div></div>
+    <!-- Row 2: Owner Distros, Investment Contributions, Cash Flow -->
+    <div class="summary-card"><div class="value orange" id="totalDistros">—</div><div class="label">Owner Distributions</div></div>
+    <div class="summary-card"><div class="value orange" id="totalInvest">—</div><div class="label">Investment Contributions</div></div>
     <div class="summary-card"><div class="value" id="cashFlow">—</div><div class="label">Cash Flow</div></div>
   </div>
 
@@ -1061,13 +1066,17 @@ function renderPeriodDashboard() {
   // Period title
   document.getElementById('periodTitle').textContent = period.label;
 
-  // Summary cards
+  // Summary cards — Row 1
   document.getElementById('totalIncome').textContent = fmt(comp.totalIncome);
   document.getElementById('totalExpenses').textContent = fmt(comp.totalOpex);
 
   const niEl = document.getElementById('netIncome');
   niEl.textContent = fmt(comp.netIncome);
   niEl.className = 'value ' + (comp.netIncome >= 0 ? 'green' : 'red');
+
+  // Summary cards — Row 2
+  document.getElementById('totalDistros').textContent = comp.totalDistributions > 0 ? fmt(-comp.totalDistributions) : '—';
+  document.getElementById('totalInvest').textContent = comp.totalInvestments > 0 ? fmt(-comp.totalInvestments) : '—';
 
   const cfEl = document.getElementById('cashFlow');
   cfEl.textContent = fmt(comp.cashFlow);
