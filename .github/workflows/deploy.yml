@@ -22,8 +22,10 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Inject Airtable token
-        run: sed -i "s|__AIRTABLE_TOKEN__|${{ secrets.AIRTABLE_TOKEN }}|g" index.html "FM Manage.html" exec.html
+      - name: Inject secrets
+        run: |
+          sed -i "s|__AIRTABLE_TOKEN__|${{ secrets.AIRTABLE_TOKEN }}|g" index.html "FM Manage.html" exec.html
+          sed -i "s|__CLAUDE_API_KEY__|${{ secrets.CLAUDE_API_KEY }}|g" exec.html index.html
 
       - name: Setup Pages
         uses: actions/configure-pages@v5

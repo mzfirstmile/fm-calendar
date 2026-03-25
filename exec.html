@@ -155,6 +155,35 @@
   .loading-state { text-align:center; padding:60px 20px; color:var(--text-dim); font-size:14px; }
   .loading-state .spinner { width:24px; height:24px; margin-bottom:12px; }
 
+  /* ── Chat Widget ── */
+  .chat-fab { position:fixed; bottom:24px; right:24px; width:52px; height:52px; border-radius:50%; background:var(--text); color:#fff; border:none; cursor:pointer; font-size:22px; box-shadow:0 4px 16px rgba(0,0,0,.15); z-index:200; display:flex; align-items:center; justify-content:center; transition:transform .2s; }
+  .chat-fab:hover { transform:scale(1.08); }
+  .chat-fab.hidden { display:none; }
+
+  .chat-panel { position:fixed; bottom:24px; right:24px; width:400px; height:520px; background:var(--surface); border:1px solid var(--border); border-radius:16px; box-shadow:0 12px 40px rgba(0,0,0,.12); z-index:300; display:none; flex-direction:column; overflow:hidden; }
+  .chat-panel.open { display:flex; }
+
+  .chat-panel-header { padding:14px 18px; border-bottom:1px solid var(--border); display:flex; align-items:center; justify-content:space-between; }
+  .chat-panel-header h4 { font-size:14px; font-weight:700; }
+  .chat-close { background:none; border:none; font-size:18px; cursor:pointer; color:var(--text-dim); padding:4px; }
+
+  .chat-messages { flex:1; overflow-y:auto; padding:16px; display:flex; flex-direction:column; gap:10px; }
+  .chat-msg { max-width:85%; padding:10px 14px; border-radius:12px; font-size:13px; line-height:1.5; word-wrap:break-word; }
+  .chat-msg.user { align-self:flex-end; background:var(--text); color:#fff; border-bottom-right-radius:4px; }
+  .chat-msg.assistant { align-self:flex-start; background:var(--surface2); color:var(--text); border-bottom-left-radius:4px; }
+  .chat-msg.system { align-self:center; background:var(--green-dim); color:var(--green-dark); font-size:12px; font-weight:500; text-align:center; }
+
+  .chat-input-row { padding:12px; border-top:1px solid var(--border); display:flex; gap:8px; }
+  .chat-input { flex:1; padding:10px 14px; border:1px solid var(--border); border-radius:10px; background:var(--surface2); font-size:13px; color:var(--text); resize:none; font-family:inherit; }
+  .chat-input:focus { outline:none; border-color:var(--accent); }
+  .chat-send { padding:10px 16px; border-radius:10px; border:none; background:var(--text); color:#fff; font-size:13px; font-weight:600; cursor:pointer; transition:background .15s; }
+  .chat-send:hover { background:#333; }
+  .chat-send:disabled { opacity:.4; cursor:default; }
+
+  @media (max-width:500px) {
+    .chat-panel { width:calc(100vw - 16px); right:8px; bottom:8px; height:70vh; }
+  }
+
   /* Save toast */
   .toast { position:fixed; bottom:24px; right:24px; padding:10px 20px; background:var(--text); color:#fff; border-radius:8px; font-size:13px; font-weight:500; opacity:0; transform:translateY(10px); transition:all .3s; z-index:600; pointer-events:none; }
   .toast.show { opacity:1; transform:translateY(0); }
@@ -251,6 +280,24 @@
   </div>
 </div>
 
+<!-- Chat FAB + Panel -->
+<button class="chat-fab" id="chatFab" onclick="toggleChat()">💬</button>
+<div class="chat-panel" id="chatPanel">
+  <div class="chat-panel-header">
+    <h4>FMC Assistant</h4>
+    <button class="chat-close" onclick="toggleChat()">&times;</button>
+  </div>
+  <div class="chat-messages" id="chatMessages">
+    <div class="chat-msg assistant">Hi Morris — I can help categorize transactions, explain entries, or update Airtable. Try telling me things like "The $1.2M wire on Jan 15 is an investor contribution" or "Show me uncategorized transactions".</div>
+  </div>
+  <div class="chat-input-row">
+    <textarea class="chat-input" id="chatInput" rows="1" placeholder="Tell me about a transaction..." onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();sendChat();}"></textarea>
+    <button class="chat-send" id="chatSend" onclick="sendChat()">Send</button>
+  </div>
+</div>
+
+<!-- Local dev: config.js sets window.AIRTABLE_TOKEN (gitignored, won't exist in prod) -->
+<script src="config.js" onerror=""></script>
 <script>
 // ── Constants ──
 const PW_HASH = 'e3011a60c3cf5e71787c994f58494a8ce8bb9ed7479e11db1498054c2fec7219';
@@ -258,8 +305,19 @@ const BASE_ID = 'appTXzlQGcpVk3IcU';
 const TABLE_ID = 'tbl9ahPA1hA2hZrv0';
 const MAIN_ACCT = '483101560383';
 
+// ── Corporate accounts to INCLUDE (everything else is excluded) ──
+const INCLUDE_ACCOUNTS = {
+  '483101560383': 'FIRST MILE CAPITAL LLC',       // Main checking
+  '483110283091': 'First Mile Capital SAVINGS',    // Savings
+  '483110897814': 'FIRST MILE MANAGEMENT LLC',     // PM fees
+  '483103381719': 'FM PARAMUS MEMBER LLC',         // AM fees
+  '483108155623': 'FM Plaza Member LLC',            // AM fees
+  '483107673423': 'FM Kemble Membe',               // AM fees (truncated)
+  '483108413860': 'FM RED MEMBER LLC',             // Member
+};
+
 // Account classifications
-const MEMBER_ACCOUNTS = ['FM PARAMUS MEMBER LLC', 'FM Paramus Member LLC', 'FM Plaza Member LLC', 'FM Kemble Membe', 'FM Kemble Member LLC'];
+const MEMBER_ACCOUNTS = ['FM PARAMUS MEMBER LLC', 'FM Paramus Member LLC', 'FM Plaza Member LLC', 'FM Kemble Membe', 'FM Kemble Member LLC', 'FM RED MEMBER LLC'];
 const MGMT_ACCOUNT = 'First Mile Management LLC';
 const INVESTOR_ACCOUNTS = ['FM 340 Kemble LLC Investors'];
 
@@ -300,8 +358,11 @@ const ALL_CATEGORIES = [
   'Payroll', 'Credit Cards', 'Legal/Corp Services', 'Taxes',
   'Wire Payments', 'Banking', 'Checks', 'AM Partner Payout',
   'PM Expenses', 'Software/Services', 'Other Operating',
-  'Internal Transfer', 'Payroll Reimbursement'
+  'Internal Transfer', 'Payroll Reimbursement', 'Investor Contribution (Pass-Through)'
 ];
+
+// Claude API key — injected at build time by GitHub Actions
+const CLAUDE_API_KEY = window.CLAUDE_API_KEY || '__CLAUDE_API_KEY__';
 
 // State
 let allRecords = [];
@@ -333,8 +394,9 @@ async function checkPassword() {
 }
 
 // ── Token Management ──
-// Injected at build time by GitHub Actions from repo secret AIRTABLE_TOKEN
-const AIRTABLE_TOKEN = '__AIRTABLE_TOKEN__';
+// Production: injected at build time by GitHub Actions (sed replaces placeholder)
+// Local dev: loaded from config.js (gitignored) which sets window.AIRTABLE_TOKEN
+const AIRTABLE_TOKEN = window.AIRTABLE_TOKEN || '__AIRTABLE_TOKEN__';
 function getToken() { return AIRTABLE_TOKEN; }
 
 // ── Init ──
@@ -375,8 +437,17 @@ async function loadData() {
 
   try {
     const token = getToken();
-    allRecords = await fetchAllRecords(token);
-    // Data loaded successfully
+    const raw = await fetchAllRecords(token);
+    // Filter to corporate-level accounts only
+    // Filter to corporate-level accounts only (by number or name)
+    const includeNums = new Set(Object.keys(INCLUDE_ACCOUNTS));
+    const includeNames = new Set(Object.values(INCLUDE_ACCOUNTS).map(n => n.toUpperCase()));
+    allRecords = raw.filter(r => {
+      const acctNum = String(getAccountNumber(r)).trim();
+      const acctName = getAccountName(r).toUpperCase().trim();
+      return includeNums.has(acctNum) || includeNames.has(acctName);
+    });
+    console.log(`Loaded ${raw.length} records, filtered to ${allRecords.length} corporate accounts`);
     bar.className = 'loading-bar done';
     buildPeriods();
     selectedPeriodIndex = periods.length - 1;
@@ -415,7 +486,7 @@ function getField(record, name) {
 function getAccountName(r) { const v = getField(r, 'Account Name'); return !v ? '' : (typeof v === 'object' ? (v.name||'') : v); }
 function getDescription(r) { return getField(r, 'Description') || ''; }
 function getAmount(r) { return getField(r, 'Amount') || 0; }
-function getAccountNumber(r) { return getField(r, 'Account Number') || ''; }
+function getAccountNumber(r) { const v = getField(r, 'Account Number'); return !v ? '' : (typeof v === 'object' ? (v.name||'') : String(v)); }
 
 function fmt(n) {
   const abs = Math.abs(n);
@@ -923,8 +994,134 @@ function changeCategory(recordId, newCategory) {
   categoryOverrides[recordId] = newCategory;
   localStorage.setItem('_exec_cat_overrides', JSON.stringify(categoryOverrides));
   showToast(`Category → ${newCategory}`);
-  // Re-render the period dashboard (keeps drilldown open with refreshed data)
   renderPeriodDashboard();
+}
+
+// ── Chat Widget ──
+let chatHistory = [];
+
+function toggleChat() {
+  const panel = document.getElementById('chatPanel');
+  const fab = document.getElementById('chatFab');
+  const isOpen = panel.classList.toggle('open');
+  fab.classList.toggle('hidden', isOpen);
+  if (isOpen) document.getElementById('chatInput').focus();
+}
+
+function addChatMsg(role, text) {
+  const div = document.createElement('div');
+  div.className = `chat-msg ${role}`;
+  div.textContent = text;
+  document.getElementById('chatMessages').appendChild(div);
+  div.scrollIntoView({ behavior: 'smooth' });
+}
+
+function buildTransactionContext() {
+  // Build a compact summary of current period transactions for Claude
+  if (!periods.length) return 'No data loaded.';
+  const period = periods[selectedPeriodIndex];
+  const recs = getRecordsForPeriod(period);
+  const lines = recs.slice(0, 150).map(r => {
+    const d = getDate(r).toISOString().slice(0,10);
+    const desc = getDescription(r);
+    const amt = getAmount(r);
+    const acct = getAccountName(r);
+    const { type } = categorize(r);
+    return `${d} | ${desc} | ${amt} | ${acct} | cat: ${type} | id: ${r.id}`;
+  });
+  return `Current period: ${period.label}\nTransactions (date|desc|amount|account|category|recordId):\n${lines.join('\n')}`;
+}
+
+async function sendChat() {
+  const input = document.getElementById('chatInput');
+  const msg = input.value.trim();
+  if (!msg) return;
+
+  input.value = '';
+  addChatMsg('user', msg);
+
+  const sendBtn = document.getElementById('chatSend');
+  sendBtn.disabled = true;
+
+  // Build system prompt with transaction context
+  const systemPrompt = `You are an AI financial assistant for First Mile Capital (FMC). You help Morris manage and categorize bank transactions.
+
+CONTEXT:
+${buildTransactionContext()}
+
+AVAILABLE CATEGORIES: ${ALL_CATEGORIES.join(', ')}
+
+ACCOUNT CONTEXT:
+- Corporate accounts only: First Mile Capital (checking/savings), First Mile Management, Member accounts (Paramus, Plaza, Kemble, Red)
+- AM fees come into Member accounts, PM fees into Management
+- Biweekly transfers of $20200, $19939, $16287, $2011.36 are payroll reimbursements
+- Investor contributions (typically $1M+) are pass-through — not income
+
+CAPABILITIES:
+When the user tells you about a transaction's true category, respond with a JSON action block like:
+ACTION: {"type":"recategorize","recordId":"recXXX","category":"Category Name"}
+You can include multiple ACTION lines. Only use ACTION when the user explicitly tells you to change something.
+
+When the user asks questions, just answer naturally. Be concise.`;
+
+  chatHistory.push({ role: 'user', content: msg });
+
+  try {
+    const resp = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-api-key': CLAUDE_API_KEY,
+        'anthropic-version': '2023-06-01',
+        'anthropic-dangerous-direct-browser-access': 'true'
+      },
+      body: JSON.stringify({
+        model: 'claude-sonnet-4-20250514',
+        max_tokens: 1024,
+        system: systemPrompt,
+        messages: chatHistory.slice(-10) // Keep last 10 turns for context
+      })
+    });
+
+    if (!resp.ok) {
+      const err = await resp.text();
+      throw new Error(`API ${resp.status}: ${err}`);
+    }
+
+    const data = await resp.json();
+    const reply = data.content[0].text;
+
+    chatHistory.push({ role: 'assistant', content: reply });
+
+    // Parse ACTION blocks
+    const actionLines = reply.split('\n').filter(l => l.startsWith('ACTION:'));
+    const cleanReply = reply.split('\n').filter(l => !l.startsWith('ACTION:')).join('\n').trim();
+
+    if (cleanReply) addChatMsg('assistant', cleanReply);
+
+    // Execute actions
+    for (const line of actionLines) {
+      try {
+        const json = JSON.parse(line.replace('ACTION:', '').trim());
+        if (json.type === 'recategorize' && json.recordId && json.category) {
+          categoryOverrides[json.recordId] = json.category;
+          localStorage.setItem('_exec_cat_overrides', JSON.stringify(categoryOverrides));
+          addChatMsg('system', `Updated: ${json.category}`);
+        }
+      } catch(e) { /* skip malformed action */ }
+    }
+
+    if (actionLines.length > 0) {
+      renderPeriodDashboard();
+    }
+
+  } catch (e) {
+    console.error(e);
+    addChatMsg('assistant', `Error: ${e.message}. Make sure your Claude API key is configured.`);
+  }
+
+  sendBtn.disabled = false;
+  input.focus();
 }
 </script>
 </body>

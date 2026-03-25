@@ -155,6 +155,29 @@
     .ev { font-size:8px; }
     .row { grid-template-columns:28px 55px 70px 1fr 70px; font-size:11px; }
   }
+
+  /* ── Chat Widget ── */
+  .chat-fab { position:fixed; bottom:24px; right:24px; width:52px; height:52px; border-radius:50%; background:var(--text); color:#fff; border:none; cursor:pointer; font-size:22px; box-shadow:0 4px 16px rgba(0,0,0,.15); z-index:200; display:flex; align-items:center; justify-content:center; transition:transform .2s; }
+  .chat-fab:hover { transform:scale(1.08); }
+  .chat-fab.hidden { display:none; }
+  .chat-panel { position:fixed; bottom:24px; right:24px; width:400px; height:520px; background:var(--surface); border:1px solid var(--border); border-radius:16px; box-shadow:0 12px 40px rgba(0,0,0,.12); z-index:300; display:none; flex-direction:column; overflow:hidden; }
+  .chat-panel.open { display:flex; }
+  .chat-panel-header { padding:14px 18px; border-bottom:1px solid var(--border); display:flex; align-items:center; justify-content:space-between; }
+  .chat-panel-header h4 { font-size:14px; font-weight:700; }
+  .chat-close { background:none; border:none; font-size:18px; cursor:pointer; color:var(--text-dim); padding:4px; }
+  .chat-messages { flex:1; overflow-y:auto; padding:16px; display:flex; flex-direction:column; gap:10px; }
+  .chat-msg { max-width:85%; padding:10px 14px; border-radius:12px; font-size:13px; line-height:1.5; word-wrap:break-word; }
+  .chat-msg.user { align-self:flex-end; background:var(--text); color:#fff; border-bottom-right-radius:4px; }
+  .chat-msg.assistant { align-self:flex-start; background:var(--surface2); color:var(--text); border-bottom-left-radius:4px; }
+  .chat-input-row { padding:12px; border-top:1px solid var(--border); display:flex; gap:8px; }
+  .chat-input { flex:1; padding:10px 14px; border:1px solid var(--border); border-radius:10px; background:var(--surface2); font-size:13px; color:var(--text); resize:none; font-family:inherit; }
+  .chat-input:focus { outline:none; border-color:var(--accent); }
+  .chat-send { padding:10px 16px; border-radius:10px; border:none; background:var(--text); color:#fff; font-size:13px; font-weight:600; cursor:pointer; transition:background .15s; }
+  .chat-send:hover { background:#0a1a2e; }
+  .chat-send:disabled { opacity:.4; cursor:default; }
+  .toast { position:fixed; bottom:24px; left:50%; transform:translateX(-50%) translateY(10px); padding:10px 20px; background:var(--text); color:#fff; border-radius:8px; font-size:13px; font-weight:500; opacity:0; transition:all .3s; z-index:600; pointer-events:none; }
+  .toast.show { opacity:1; transform:translateX(-50%) translateY(0); }
+  @media(max-width:500px) { .chat-panel { width:calc(100vw - 16px); right:8px; bottom:8px; height:70vh; } }
 </style>
 </head>
 <body>
@@ -453,6 +476,117 @@ async function init(){
   else{EVENTS=[...DEFAULTS];buildClrs();activeFilters=new Set(Object.keys(COLORS));setSync('error','Could not connect');showUI();buildFilters();render();}
 }
 init();
+
+// ── Chat Widget ──
+const CLAUDE_API_KEY = window.CLAUDE_API_KEY || '__CLAUDE_API_KEY__';
+let chatHistory = [];
+
+function toggleChat() {
+  const panel = document.getElementById('chatPanel');
+  const fab = document.getElementById('chatFab');
+  const isOpen = panel.classList.toggle('open');
+  fab.classList.toggle('hidden', isOpen);
+  if (isOpen) document.getElementById('chatInput').focus();
+}
+
+function addChatMsg(role, text) {
+  const div = document.createElement('div');
+  div.className = `chat-msg ${role}`;
+  div.textContent = text;
+  document.getElementById('chatMessages').appendChild(div);
+  div.scrollIntoView({ behavior: 'smooth' });
+}
+
+function buildCalendarContext() {
+  // Build a summary of deadlines for Claude
+  const now = new Date();
+  const month = currentMonth;
+  const monthEvents = EVENTS.filter(ev => {
+    const d = new Date(ev.date);
+    return d.getMonth() === month && d.getFullYear() === 2026;
+  }).sort((a, b) => new Date(a.date) - new Date(b.date));
+
+  const lines = monthEvents.map(ev => {
+    const done = isC(ev.id);
+    return `${ev.date} | ${ev.property} | ${ev.type} | ${ev.task} | ${ev.owner} | ${done ? 'DONE' : 'PENDING'}`;
+  });
+
+  const MONTHS = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+  return `Current month: ${MONTHS[month]} 2026\nDeadlines (date|property|type|task|owner|status):\n${lines.join('\n')}`;
+}
+
+async function sendChat() {
+  const input = document.getElementById('chatInput');
+  const msg = input.value.trim();
+  if (!msg) return;
+
+  input.value = '';
+  addChatMsg('user', msg);
+
+  const sendBtn = document.getElementById('chatSend');
+  sendBtn.disabled = true;
+
+  const systemPrompt = `You are an AI assistant for First Mile Capital's accounting calendar. You help Morris track deadlines, filings, and accounting tasks across the FMC real estate portfolio.
+
+CONTEXT:
+${buildCalendarContext()}
+
+You can answer questions about upcoming deadlines, what's overdue, who owns what task, and general accounting guidance. Be concise and helpful.`;
+
+  chatHistory.push({ role: 'user', content: msg });
+
+  try {
+    const resp = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-api-key': CLAUDE_API_KEY,
+        'anthropic-version': '2023-06-01',
+        'anthropic-dangerous-direct-browser-access': 'true'
+      },
+      body: JSON.stringify({
+        model: 'claude-sonnet-4-20250514',
+        max_tokens: 1024,
+        system: systemPrompt,
+        messages: chatHistory.slice(-10)
+      })
+    });
+
+    if (!resp.ok) {
+      const err = await resp.text();
+      throw new Error(`API ${resp.status}: ${err}`);
+    }
+
+    const data = await resp.json();
+    const reply = data.content[0].text;
+    chatHistory.push({ role: 'assistant', content: reply });
+    addChatMsg('assistant', reply);
+
+  } catch (e) {
+    console.error(e);
+    addChatMsg('assistant', `Error: ${e.message}`);
+  }
+
+  sendBtn.disabled = false;
+  input.focus();
+}
 </script>
+
+<!-- Chat FAB + Panel -->
+<button class="chat-fab" id="chatFab" onclick="toggleChat()">💬</button>
+<div class="chat-panel" id="chatPanel">
+  <div class="chat-panel-header">
+    <h4>FMC Assistant</h4>
+    <button class="chat-close" onclick="toggleChat()">&times;</button>
+  </div>
+  <div class="chat-messages" id="chatMessages">
+    <div class="chat-msg assistant">Hi Morris — ask me about upcoming deadlines, overdue tasks, or anything about the accounting calendar.</div>
+  </div>
+  <div class="chat-input-row">
+    <textarea class="chat-input" id="chatInput" rows="1" placeholder="Ask about deadlines..." onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();sendChat();}"></textarea>
+    <button class="chat-send" id="chatSend" onclick="sendChat()">Send</button>
+  </div>
+</div>
+<div class="toast" id="toast"></div>
 </body>
 </html>
