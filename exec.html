@@ -778,9 +778,9 @@ function categorize(record) {
     return { category: 'income', type: 'Investment Income' };
   }
 
-  // Appfolio distributions (description contains APPFOLIO or SIGONFILE for property deposits)
+  // Appfolio distributions — owner distributions from property investments
   if (desc.includes('APPFOLIO') && amount > 0) {
-    return { category: 'income', type: 'Investment Income' };
+    return { category: 'distribution', type: 'Owner Distributions' };
   }
 
   // Main operating account logic
@@ -796,7 +796,7 @@ function categorize(record) {
     if (isTransfer && amount < 0) return { category: 'excluded', type: 'Internal Transfer' };
 
     // Sigonfile deposits
-    if (desc.includes('SIGONFILE') && amount > 0) return { category: 'income', type: 'Investment Income' };
+    if (desc.includes('SIGONFILE') && amount > 0) return { category: 'distribution', type: 'Owner Distributions' };
 
     // Wire in
     if (desc.includes('WIRE') && amount > 0) return { category: 'income', type: 'Other Income' };
@@ -1211,54 +1211,103 @@ function openDrilldown(type, cssClass) {
   const period = periods[selectedPeriodIndex];
   const records = getRecordsForPeriod(period);
 
-  // Find records matching this category
-  const matching = records.filter(r => {
-    const { type: t } = categorize(r);
-    return t === type;
-  });
+  // For Payroll drilldown, also include reimbursements (payroll_offset) and PM fee splits
+  let drillItems = []; // { date, desc, acct, amount, recordId, currentType, isSynthetic }
+
+  if (type === 'Payroll') {
+    // 1. Justworks debits (negative)
+    records.forEach(r => {
+      const { type: t } = categorize(r);
+      if (t === 'Payroll') {
+        drillItems.push({ date: getDate(r), desc: getDescription(r), acct: getAccountName(r), amount: getAmount(r), recordId: r.id, currentType: t, isSynthetic: false });
+      }
+    });
+    // 2. Payroll Reimbursement records (transfers + pa-mgmt BILLPAY) — positive
+    records.forEach(r => {
+      const { category, type: t } = categorize(r);
+      if (category === 'payroll_offset') {
+        drillItems.push({ date: getDate(r), desc: getDescription(r), acct: getAccountName(r), amount: getAmount(r), recordId: r.id, currentType: t, isSynthetic: false });
+      }
+    });
+    // 3. PM fee payroll splits — synthetic positive entries
+    records.forEach(r => {
+      const splitAmt = payrollSplits[r.id];
+      if (splitAmt && splitAmt > 0 && categorize(r).category === 'income') {
+        drillItems.push({ date: getDate(r), desc: `Payroll reimb. split from: ${getDescription(r).slice(0,60)}…`, acct: getAccountName(r), amount: splitAmt, recordId: null, currentType: 'Payroll Reimbursement', isSynthetic: true });
+      }
+    });
+  } else {
+    // Standard: find records matching this category
+    records.forEach(r => {
+      const { type: t } = categorize(r);
+      if (t === type) {
+        drillItems.push({ date: getDate(r), desc: getDescription(r), acct: getAccountName(r), amount: getAmount(r), recordId: r.id, currentType: t, isSynthetic: false });
+      }
+    });
+  }
 
   // Sort by date descending
-  matching.sort((a, b) => getDate(b) - getDate(a));
+  drillItems.sort((a, b) => b.date - a.date);
 
   document.getElementById('drilldownTitle').textContent = `${type} — ${period.label}`;
 
+  // For Payroll, add a summary bar showing debits/credits/net
+  let summaryHtml = '';
+  if (type === 'Payroll') {
+    const debits = drillItems.filter(d => d.amount < 0).reduce((s, d) => s + d.amount, 0);
+    const credits = drillItems.filter(d => d.amount > 0).reduce((s, d) => s + d.amount, 0);
+    const net = debits + credits;
+    summaryHtml = `<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;margin-bottom:20px;padding:16px;background:var(--surface2);border-radius:10px;">
+      <div style="text-align:center;"><div style="font-size:10px;font-weight:600;color:var(--text-dim);text-transform:uppercase;letter-spacing:.3px;margin-bottom:4px;">Debits (Out)</div><div style="font-size:18px;font-weight:700;color:var(--red-dark);">${fmtFull(debits)}</div></div>
+      <div style="text-align:center;"><div style="font-size:10px;font-weight:600;color:var(--text-dim);text-transform:uppercase;letter-spacing:.3px;margin-bottom:4px;">Credits (In)</div><div style="font-size:18px;font-weight:700;color:var(--green-dark);">+${fmtFull(credits)}</div></div>
+      <div style="text-align:center;"><div style="font-size:10px;font-weight:600;color:var(--text-dim);text-transform:uppercase;letter-spacing:.3px;margin-bottom:4px;">Net Payroll</div><div style="font-size:18px;font-weight:700;color:${net >= 0 ? 'var(--green-dark)' : 'var(--red-dark)'};">${fmtFull(net)}</div></div>
+    </div>`;
+  }
+
   // Group by date
   const groups = {};
-  matching.forEach(r => {
-    const d = getDate(r);
-    const key = d.toLocaleDateString('en-US', { month:'long', day:'numeric', year:'numeric' });
+  drillItems.forEach(d => {
+    const key = d.date.toLocaleDateString('en-US', { month:'long', day:'numeric', year:'numeric' });
     if (!groups[key]) groups[key] = [];
-    groups[key].push(r);
+    groups[key].push(d);
   });
 
-  let html = '';
-  Object.entries(groups).forEach(([dateStr, recs]) => {
-    const dayTotal = recs.reduce((s, r) => s + getAmount(r), 0);
+  let html = summaryHtml;
+  Object.entries(groups).forEach(([dateStr, items]) => {
+    const dayTotal = items.reduce((s, d) => s + d.amount, 0);
     html += `<div class="txn-date-group">${dateStr}<span style="float:right">${dayTotal >= 0 ? '+' : ''}${fmtFull(dayTotal)}</span></div>`;
-    recs.forEach(r => {
-      const amount = getAmount(r);
-      const { type: currentType } = categorize(r);
-      const amtClass = amount >= 0 ? 'green' : 'red';
-      const amtStr = (amount >= 0 ? '+' : '') + fmtFull(amount);
+    items.forEach(d => {
+      const amtClass = d.amount >= 0 ? 'green' : 'red';
+      const amtStr = (d.amount >= 0 ? '+' : '') + fmtFull(d.amount);
 
-      // Build category select options
-      const options = ALL_CATEGORIES.map(c =>
-        `<option value="${c}" ${c === currentType ? 'selected' : ''}>${c}</option>`
-      ).join('');
-
-      html += `
-        <div class="txn-row">
-          <div class="txn-desc" title="${getDescription(r)}">${getDescription(r)}</div>
-          <div class="txn-acct">${getAccountName(r)}</div>
-          <select class="txn-cat-select" onchange="changeCategory('${r.id}', this.value)">
-            ${options}
-          </select>
-          <div class="txn-amount ${amtClass}">${amtStr}</div>
-        </div>`;
+      if (d.isSynthetic) {
+        // Synthetic row (no category dropdown)
+        html += `
+          <div class="txn-row">
+            <div class="txn-desc" title="${d.desc}" style="color:var(--green-dark);font-style:italic;">${d.desc}</div>
+            <div class="txn-acct">${d.acct}</div>
+            <div class="txn-cat-select" style="border:none;background:none;font-size:12px;color:var(--text-dim);">PM Split</div>
+            <div class="txn-amount ${amtClass}">${amtStr}</div>
+          </div>`;
+      } else {
+        // Real record with category dropdown
+        const options = ALL_CATEGORIES.map(c =>
+          `<option value="${c}" ${c === d.currentType ? 'selected' : ''}>${c}</option>`
+        ).join('');
+        html += `
+          <div class="txn-row">
+            <div class="txn-desc" title="${d.desc}">${d.desc}</div>
+            <div class="txn-acct">${d.acct}</div>
+            <select class="txn-cat-select" onchange="changeCategory('${d.recordId}', this.value)">
+              ${options}
+            </select>
+            <div class="txn-amount ${amtClass}">${amtStr}</div>
+          </div>`;
+      }
     });
   });
 
-  if (matching.length === 0) {
+  if (drillItems.length === 0) {
     html = '<p style="color:var(--text-dim);padding:20px;text-align:center;">No transactions in this category for this period.</p>';
   }
 
@@ -1508,6 +1557,15 @@ async function loadBalanceSheet() {
     ]);
     bsInvestments = inv;
     bsLiabilities = liab;
+    // Sort liabilities by maturity date ascending (oldest first)
+    bsLiabilities.sort((a, b) => {
+      const mA = getLiabField(a, 'maturity');
+      const mB = getLiabField(b, 'maturity');
+      if (!mA && !mB) return 0;
+      if (!mA) return 1;
+      if (!mB) return -1;
+      return new Date(mA) - new Date(mB);
+    });
     renderBalanceSheet();
   } catch (e) {
     console.error('Balance sheet load error:', e);
