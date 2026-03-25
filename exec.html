@@ -59,11 +59,15 @@
   .btn.accent { color:var(--accent); border-color:rgba(0,176,212,.3); background:var(--accent-dim); }
 
   /* ── Dashboard ── */
-  .dashboard { padding:0 40px 40px; display:none; max-width:1200px; margin:0 auto; }
+  .dashboard { padding:0 40px 40px; display:none; max-width:1400px; margin:0 auto; }
   .dashboard.show { display:block; }
 
+  /* Two-column layout */
+  .dashboard-grid { display:grid; grid-template-columns:380px 1fr; gap:24px; margin-top:24px; }
+  @media (max-width:1000px) { .dashboard-grid { grid-template-columns:1fr; } }
+
   /* ── Cash Flow Section ── */
-  .cf-section { background:var(--surface); border:1px solid var(--border); border-radius:12px; padding:24px; margin-top:24px; margin-bottom:24px; }
+  .cf-section { background:var(--surface); border:1px solid var(--border); border-radius:12px; padding:24px; margin-bottom:24px; }
   .cf-header { display:flex; align-items:center; justify-content:space-between; margin-bottom:20px; }
   .cf-header h2 { font-size:18px; font-weight:700; }
   .cf-toggle { display:flex; gap:0; border:1px solid var(--border); border-radius:8px; overflow:hidden; }
@@ -187,6 +191,66 @@
   /* Save toast */
   .toast { position:fixed; bottom:24px; right:24px; padding:10px 20px; background:var(--text); color:#fff; border-radius:8px; font-size:13px; font-weight:500; opacity:0; transform:translateY(10px); transition:all .3s; z-index:600; pointer-events:none; }
   .toast.show { opacity:1; transform:translateY(0); }
+
+  /* ── Balance Sheet ── */
+  .bs-section { margin-bottom:20px; }
+  .bs-section-title { font-size:18px; font-weight:700; margin-bottom:16px; display:flex; align-items:center; gap:10px; }
+  .bs-section-title .bs-badge { font-size:10px; font-weight:600; padding:2px 8px; border-radius:20px; background:var(--accent-dim); color:var(--accent); text-transform:uppercase; letter-spacing:.5px; }
+
+  /* Net position bar — vertical stack for sidebar */
+  .bs-net-bar { background:var(--surface); border:1px solid var(--border); border-radius:14px; padding:20px; margin-bottom:16px; position:relative; overflow:hidden; }
+  .bs-net-bar::before { content:''; position:absolute; top:0; left:0; right:0; height:3px; background:linear-gradient(90deg, var(--green), var(--accent)); }
+  .bs-net-row { display:flex; flex-direction:column; gap:16px; }
+  .bs-net-side { text-align:center; }
+  .bs-net-side .bs-net-label { font-size:10px; font-weight:600; color:var(--text-dim); text-transform:uppercase; letter-spacing:.5px; margin-bottom:4px; }
+  .bs-net-side .bs-net-value { font-size:22px; font-weight:700; font-family:'SF Mono','Fira Code',monospace; }
+  .bs-net-side .bs-net-value.green { color:var(--green-dark); }
+  .bs-net-side .bs-net-value.red { color:var(--red-dark); }
+  .bs-net-divider { height:1px; width:100%; background:var(--border); }
+  .bs-net-center { text-align:center; padding:8px 0; }
+  .bs-net-center .bs-net-label { font-size:10px; font-weight:600; color:var(--text-dim); text-transform:uppercase; letter-spacing:.5px; margin-bottom:4px; }
+  .bs-net-center .bs-net-value { font-size:28px; font-weight:800; }
+
+  /* Stacked bar */
+  .bs-stack-bar { margin-top:20px; height:10px; border-radius:5px; background:var(--surface2); overflow:hidden; display:flex; }
+  .bs-stack-bar .bs-bar-seg { height:100%; transition:width .5s ease; }
+  .bs-stack-bar .bs-bar-cash { background:var(--accent); }
+  .bs-stack-bar .bs-bar-inv { background:var(--green); }
+  .bs-stack-bar .bs-bar-liab { background:var(--red); }
+  .bs-stack-legend { display:flex; gap:20px; margin-top:10px; justify-content:center; }
+  .bs-stack-legend span { font-size:11px; color:var(--text-dim); display:flex; align-items:center; gap:5px; }
+  .bs-stack-legend .dot { width:8px; height:8px; border-radius:50%; display:inline-block; }
+
+  /* Investment cards */
+  .bs-grid { display:grid; grid-template-columns:1fr; gap:12px; margin-bottom:16px; }
+  .bs-card { background:var(--surface); border:1px solid var(--border); border-radius:10px; padding:14px; transition:box-shadow .2s; }
+  .bs-card:hover { box-shadow:0 4px 20px rgba(0,0,0,.06); }
+  .bs-card-header { display:flex; align-items:center; justify-content:space-between; margin-bottom:10px; }
+  .bs-card-title { font-size:13px; font-weight:600; }
+  .bs-card-ownership { font-size:10px; font-weight:600; color:var(--accent); background:var(--accent-dim); padding:2px 7px; border-radius:12px; white-space:nowrap; }
+  .bs-card-metrics { display:grid; grid-template-columns:1fr 1fr; gap:8px; }
+  .bs-metric { }
+  .bs-metric-label { font-size:9px; font-weight:600; color:var(--text-dim); text-transform:uppercase; letter-spacing:.3px; margin-bottom:2px; }
+  .bs-metric-value { font-size:13px; font-weight:600; font-family:'SF Mono','Fira Code',monospace; }
+  .bs-metric-value.green { color:var(--green-dark); }
+  .bs-metric-value.red { color:var(--red-dark); }
+
+  /* Liabilities */
+  .bs-liab-card { background:var(--surface); border:1px solid var(--border); border-radius:10px; padding:14px; margin-bottom:10px; }
+  .bs-liab-header { display:flex; align-items:flex-start; justify-content:space-between; margin-bottom:8px; gap:8px; }
+  .bs-liab-title { font-size:13px; font-weight:600; }
+  .bs-liab-amount { font-size:14px; font-weight:700; font-family:'SF Mono','Fira Code',monospace; color:var(--red-dark); white-space:nowrap; }
+  .bs-liab-details { display:flex; gap:16px; flex-wrap:wrap; }
+  .bs-liab-detail { }
+  .bs-liab-detail-label { font-size:9px; font-weight:600; color:var(--text-dim); text-transform:uppercase; letter-spacing:.3px; }
+  .bs-liab-detail-value { font-size:12px; font-weight:500; margin-top:2px; }
+  .bs-maturity-badge { display:inline-block; font-size:11px; font-weight:600; padding:2px 8px; border-radius:12px; }
+  .bs-maturity-badge.far { background:var(--green-dim); color:var(--green-dark); }
+  .bs-maturity-badge.mid { background:var(--orange-dim); color:var(--orange); }
+  .bs-maturity-badge.near { background:var(--red-dim); color:var(--red-dark); }
+
+  .bs-sub-header { font-size:12px; font-weight:700; color:var(--text-dim); margin-bottom:10px; text-transform:uppercase; letter-spacing:.5px; display:flex; align-items:center; gap:8px; }
+  .bs-sub-header::after { content:''; flex:1; height:1px; background:var(--border); }
 </style>
 </head>
 <body>
@@ -218,6 +282,53 @@
 </header>
 
 <div class="dashboard" id="dashboard">
+  <div class="dashboard-grid">
+  <!-- LEFT: Balance Sheet -->
+  <div class="dashboard-left">
+  <div class="bs-section" id="balanceSheet">
+    <div class="bs-section-title">Balance Sheet <span class="bs-badge">Live</span></div>
+
+    <!-- Net Position Summary -->
+    <div class="bs-net-bar" id="bsNetBar">
+      <div class="bs-net-row">
+        <div class="bs-net-center">
+          <div class="bs-net-label">Net Position</div>
+          <div class="bs-net-value" id="bsNetPosition">—</div>
+        </div>
+        <div class="bs-net-divider"></div>
+        <div class="bs-net-side">
+          <div class="bs-net-label">Total Assets</div>
+          <div class="bs-net-value green" id="bsTotalAssets">—</div>
+        </div>
+        <div class="bs-net-side">
+          <div class="bs-net-label">Total Liabilities</div>
+          <div class="bs-net-value red" id="bsTotalLiabilities">—</div>
+        </div>
+      </div>
+      <div class="bs-stack-bar" id="bsStackBar"></div>
+      <div class="bs-stack-legend">
+        <span><span class="dot" style="background:var(--accent)"></span> Cash</span>
+        <span><span class="dot" style="background:var(--green)"></span> Investments</span>
+        <span><span class="dot" style="background:var(--red)"></span> Liabilities</span>
+      </div>
+    </div>
+
+    <!-- Investments -->
+    <div class="bs-sub-header">Investments</div>
+    <div class="bs-grid" id="bsInvestments">
+      <div class="loading-state"><div class="spinner"></div><br>Loading…</div>
+    </div>
+
+    <!-- Liabilities -->
+    <div class="bs-sub-header">Liabilities</div>
+    <div id="bsLiabilities">
+      <div class="loading-state"><div class="spinner"></div><br>Loading…</div>
+    </div>
+  </div>
+  </div>
+
+  <!-- RIGHT: Cash Flow & Period Details -->
+  <div class="dashboard-right">
   <!-- Cash Flow Chart -->
   <div class="cf-section">
     <div class="cf-header">
@@ -278,6 +389,8 @@
     <h3>Internal Transfers &amp; Excluded <span id="excludedBadge" style="font-weight:400;font-size:12px;color:var(--text-dim)"></span></h3>
     <div id="excludedRows"></div>
   </div>
+  </div><!-- /dashboard-right -->
+  </div><!-- /dashboard-grid -->
 </div>
 
 <!-- Chat FAB + Panel -->
@@ -480,6 +593,7 @@ async function loadData() {
     buildPeriods();
     selectedPeriodIndex = periods.length - 1;
     renderAll();
+    loadBalanceSheet();
   } catch (e) {
     bar.className = 'loading-bar';
     console.error(e);
@@ -1155,6 +1269,270 @@ When the user asks questions, just answer naturally. Be concise.`;
 
   sendBtn.disabled = false;
   input.focus();
+}
+
+// ── Balance Sheet ──
+const INVESTMENTS_TABLE = 'tblzZn4NMXUYRZBqt';
+const LIABILITIES_TABLE = 'tblh9ZKlCwyreJ8tM';
+
+// Field IDs for Investments table
+const INV_FIELDS = {
+  name: 'fldX5ys676ayoxNYc',
+  membershipClass: 'fldq3aDBIuBTwmFrr',
+  ownership: 'fldU6w5LV9vnwBStm',
+  committed: 'fldQwyDR70uO6gJUR',
+  contributed: 'fldJSQQcIZAoNqSk6',
+  distributed: 'fldtO65Vvx5qG001G',
+  unreturned: 'fldVsxc6dj0X7Z7OS',
+  netEquity: 'fldviDb8s6v42qhza',
+  valuation: 'fld0EfM7mI7qdfNIf',
+  status: 'fld5SZIIZQ8Rwf2Ha'
+};
+
+// Field IDs for Liabilities table
+const LIAB_FIELDS = {
+  lender: 'fldvvtM6ou0ZADJie',
+  relatedDeal: 'fldCi9osyG9TUL600',
+  principal: 'fldM2nEv5uDF5KgCU',
+  currency: 'fldPeNMUOK590jdU6',
+  usdEquiv: 'fldxjjIHSsPbzToQZ',
+  maturity: 'fld6ZRgiKHCf7dzGx',
+  status: 'fld98KXnfxZiK2mg3',
+  notes: 'fldckrJ6NdV2mgllf'
+};
+
+let bsInvestments = [];
+let bsLiabilities = [];
+let jpyToUsd = null; // live rate
+
+async function fetchJpyRate() {
+  try {
+    const resp = await fetch('https://cdn.jsdelivr.net/npm/@fawazahmed0/currency-api@latest/v1/currencies/jpy.json');
+    if (resp.ok) {
+      const data = await resp.json();
+      jpyToUsd = data.jpy.usd;
+      return;
+    }
+  } catch(e) { console.warn('Primary JPY API failed, trying fallback'); }
+  try {
+    const resp = await fetch('https://api.frankfurter.app/latest?from=JPY&to=USD');
+    if (resp.ok) {
+      const data = await resp.json();
+      jpyToUsd = data.rates.USD;
+      return;
+    }
+  } catch(e) { console.warn('Fallback JPY API also failed'); }
+}
+
+async function fetchTable(tableId) {
+  const token = getToken();
+  let records = [], offset = null;
+  do {
+    let url = `https://api.airtable.com/v0/${BASE_ID}/${tableId}?pageSize=100`;
+    if (offset) url += `&offset=${offset}`;
+    const resp = await fetch(url, { headers: { Authorization: `Bearer ${token}` } });
+    if (!resp.ok) throw new Error(`Airtable ${resp.status}`);
+    const data = await resp.json();
+    records = records.concat(data.records);
+    offset = data.offset || null;
+  } while (offset);
+  return records;
+}
+
+function getInvField(r, key) {
+  const f = r.fields;
+  const fid = INV_FIELDS[key];
+  return f[key] !== undefined ? f[key] : (fid && f[fid] !== undefined ? f[fid] : null);
+}
+
+function getLiabField(r, key) {
+  const f = r.fields;
+  const fid = LIAB_FIELDS[key];
+  // Try common field names first
+  const nameMap = { lender: ['Lender / Description', 'Lender/Description'], relatedDeal: ['Related Deal'], principal: ['Principal Amount'],
+    currency: ['Currency'], usdEquiv: ['USD Equivalent'], maturity: ['Maturity Date'], status: ['Status'], notes: ['Notes'] };
+  const names = nameMap[key] || [];
+  for (const n of names) { if (f[n] !== undefined) return f[n]; }
+  return (fid && f[fid] !== undefined) ? f[fid] : null;
+}
+
+async function loadBalanceSheet() {
+  try {
+    const [inv, liab] = await Promise.all([
+      fetchTable(INVESTMENTS_TABLE),
+      fetchTable(LIABILITIES_TABLE),
+      fetchJpyRate()
+    ]);
+    bsInvestments = inv;
+    bsLiabilities = liab;
+    renderBalanceSheet();
+  } catch (e) {
+    console.error('Balance sheet load error:', e);
+    document.getElementById('bsInvestments').innerHTML = `<p style="color:var(--red);padding:16px;">Failed to load: ${e.message}</p>`;
+  }
+}
+
+function getCashBalance() {
+  // Sum latest ledger balance per account from allRecords
+  const latestByAcct = {};
+  allRecords.forEach(r => {
+    const acct = getAccountNumber(r);
+    const d = getDate(r);
+    const bal = getField(r, 'Ledger Balance');
+    if (bal != null && acct) {
+      if (!latestByAcct[acct] || d > latestByAcct[acct].date) {
+        latestByAcct[acct] = { date: d, balance: bal };
+      }
+    }
+  });
+  return Object.values(latestByAcct).reduce((s, v) => s + v.balance, 0);
+}
+
+function renderBalanceSheet() {
+  const cash = getCashBalance();
+
+  // Investments total (use valuation if available, else unreturned capital)
+  let investmentsTotal = 0;
+  const invCards = bsInvestments.map(r => {
+    const f = r.fields;
+    const name = f[INV_FIELDS.name] || f['Investment'] || 'Unknown';
+    const ownership = f[INV_FIELDS.ownership] || f['Ownership %'] || 0;
+    const committed = f[INV_FIELDS.committed] || f['Committed'] || 0;
+    const contributed = f[INV_FIELDS.contributed] || f['Contributed'] || 0;
+    const distributed = f[INV_FIELDS.distributed] || f['Distributed'] || 0;
+    const unreturned = f[INV_FIELDS.unreturned] || f['Unreturned Capital'] || 0;
+    const valuation = f[INV_FIELDS.valuation] || f['Valuation'] || null;
+    const netEquity = f[INV_FIELDS.netEquity] || f['Net Equity'] || 0;
+    const status = f[INV_FIELDS.status] || f['Status'] || '';
+
+    const value = valuation || unreturned;
+    investmentsTotal += value;
+
+    return { name, ownership, committed, contributed, distributed, unreturned, valuation, netEquity, status, value };
+  });
+
+  // Liabilities total (USD equivalent)
+  let liabilitiesTotal = 0;
+  const liabCards = bsLiabilities.map(r => {
+    const lender = getLiabField(r, 'lender') || 'Unknown';
+    const deal = getLiabField(r, 'relatedDeal') || '';
+    const principal = getLiabField(r, 'principal') || 0;
+    const currency = getLiabField(r, 'currency') || 'USD';
+    const usdEquiv = getLiabField(r, 'usdEquiv') || null;
+    const maturity = getLiabField(r, 'maturity') || null;
+    const status = getLiabField(r, 'status') || '';
+    const notes = getLiabField(r, 'notes') || '';
+
+    // Use live JPY rate if available, else fall back to stored USD equivalent
+    let usdValue;
+    if (currency === 'USD' || (typeof currency === 'object' && currency.name === 'USD')) {
+      usdValue = principal;
+    } else if (jpyToUsd && (currency === 'JPY' || (typeof currency === 'object' && currency.name === 'JPY'))) {
+      usdValue = principal * jpyToUsd;
+    } else {
+      usdValue = usdEquiv || 0;
+    }
+    liabilitiesTotal += usdValue;
+
+    return { lender, deal, principal, currency, usdEquiv, maturity, status, notes, usdValue };
+  });
+
+  const totalAssets = cash + investmentsTotal;
+  const netPosition = totalAssets - liabilitiesTotal;
+
+  // Render summary bar
+  document.getElementById('bsTotalAssets').textContent = fmt(totalAssets);
+  document.getElementById('bsTotalLiabilities').textContent = fmt(liabilitiesTotal);
+  const npEl = document.getElementById('bsNetPosition');
+  npEl.textContent = fmt(netPosition);
+  npEl.className = 'bs-net-value ' + (netPosition >= 0 ? 'green' : 'red');
+
+  // Stacked bar
+  const barTotal = cash + investmentsTotal + liabilitiesTotal;
+  if (barTotal > 0) {
+    const cashPct = (cash / barTotal * 100).toFixed(1);
+    const invPct = (investmentsTotal / barTotal * 100).toFixed(1);
+    const liabPct = (liabilitiesTotal / barTotal * 100).toFixed(1);
+    document.getElementById('bsStackBar').innerHTML =
+      `<div class="bs-bar-seg bs-bar-cash" style="width:${cashPct}%" title="Cash: ${fmt(cash)}"></div>` +
+      `<div class="bs-bar-seg bs-bar-inv" style="width:${invPct}%" title="Investments: ${fmt(investmentsTotal)}"></div>` +
+      `<div class="bs-bar-seg bs-bar-liab" style="width:${liabPct}%" title="Liabilities: ${fmt(liabilitiesTotal)}"></div>`;
+  }
+
+  // Render investment cards
+  const invContainer = document.getElementById('bsInvestments');
+  if (invCards.length === 0) {
+    invContainer.innerHTML = '<p style="color:var(--text-dim);padding:16px;text-align:center;">No investments found.</p>';
+  } else {
+    invContainer.innerHTML = invCards.map(inv => {
+      const ownershipStr = inv.ownership ? `${(inv.ownership * 100).toFixed(2)}%` : (typeof inv.ownership === 'number' && inv.ownership > 1 ? `${inv.ownership.toFixed(2)}%` : '—');
+      // Check if ownership is already a percentage (> 1) or a decimal
+      const ownershipDisplay = inv.ownership > 1 ? `${inv.ownership.toFixed(2)}%` : (inv.ownership > 0 ? `${(inv.ownership * 100).toFixed(2)}%` : '—');
+      const contributedPct = inv.committed > 0 ? Math.round(inv.contributed / inv.committed * 100) : 100;
+      return `
+        <div class="bs-card">
+          <div class="bs-card-header">
+            <div class="bs-card-title">${inv.name}</div>
+            <div class="bs-card-ownership">${ownershipDisplay} equity</div>
+          </div>
+          <div class="bs-card-metrics">
+            <div class="bs-metric">
+              <div class="bs-metric-label">Contributed</div>
+              <div class="bs-metric-value">${fmt(inv.contributed)}</div>
+            </div>
+            <div class="bs-metric">
+              <div class="bs-metric-label">Distributed</div>
+              <div class="bs-metric-value green">${fmt(inv.distributed)}</div>
+            </div>
+          </div>
+        </div>`;
+    }).join('');
+  }
+
+  // Render liability cards
+  const liabContainer = document.getElementById('bsLiabilities');
+  if (liabCards.length === 0) {
+    liabContainer.innerHTML = '<p style="color:var(--text-dim);padding:16px;text-align:center;">No liabilities found.</p>';
+  } else {
+    liabContainer.innerHTML = liabCards.map(l => {
+      const currName = typeof l.currency === 'object' ? l.currency.name : l.currency;
+      const isJpy = currName === 'JPY';
+      let amtStr;
+      if (isJpy) {
+        const jpyStr = `¥${(l.principal/1000000).toFixed(0)}M`;
+        const usdStr = fmt(l.usdValue);
+        amtStr = `${jpyStr}<br><span style="font-size:12px;color:var(--text-dim);font-weight:500">≈ ${usdStr}${jpyToUsd ? ' (live)' : ''}</span>`;
+      } else {
+        amtStr = fmt(l.principal);
+      }
+
+      let maturityHtml = '—';
+      let maturityClass = 'far';
+      if (l.maturity) {
+        const mDate = new Date(l.maturity);
+        const now = new Date();
+        const daysLeft = Math.round((mDate - now) / (1000 * 60 * 60 * 24));
+        const yearsLeft = (daysLeft / 365).toFixed(1);
+        maturityClass = daysLeft < 365 ? 'near' : (daysLeft < 365 * 3 ? 'mid' : 'far');
+        const dateStr = mDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+        maturityHtml = `${dateStr} <span class="bs-maturity-badge ${maturityClass}">${yearsLeft}y</span>`;
+      }
+
+      return `
+        <div class="bs-liab-card">
+          <div class="bs-liab-header">
+            <div class="bs-liab-title">${l.lender}</div>
+            <div class="bs-liab-amount">${amtStr}</div>
+          </div>
+          <div class="bs-liab-details">
+            <div class="bs-liab-detail">
+              <div class="bs-liab-detail-label">Maturity</div>
+              <div class="bs-liab-detail-value">${maturityHtml}</div>
+            </div>
+          </div>
+        </div>`;
+    }).join('');
+  }
 }
 </script>
 </body>
