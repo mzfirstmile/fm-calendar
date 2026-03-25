@@ -231,11 +231,24 @@
   .bs-card-title { font-size:13px; font-weight:600; }
   .bs-card-ownership { font-size:10px; font-weight:600; color:var(--accent); background:var(--accent-dim); padding:2px 7px; border-radius:12px; white-space:nowrap; }
   .bs-card-metrics { display:grid; grid-template-columns:1fr 1fr; gap:8px; }
+  .bs-card-asset-row { margin-top:10px; padding-top:8px; border-top:1px solid var(--border); display:flex; align-items:center; justify-content:space-between; }
   .bs-metric { }
   .bs-metric-label { font-size:9px; font-weight:600; color:var(--text-dim); text-transform:uppercase; letter-spacing:.3px; margin-bottom:2px; }
   .bs-metric-value { font-size:13px; font-weight:600; font-family:'SF Mono','Fira Code',monospace; }
   .bs-metric-value.green { color:var(--green-dark); }
   .bs-metric-value.red { color:var(--red-dark); }
+  .bs-asset-value { font-size:14px; font-weight:700; font-family:'SF Mono','Fira Code',monospace; color:var(--accent); }
+  .bs-edit-btn { background:none; border:none; cursor:pointer; font-size:13px; color:var(--text-dim); padding:2px 4px; border-radius:4px; transition:all .15s; }
+  .bs-edit-btn:hover { background:var(--surface2); color:var(--text); }
+  .bs-edit-input { width:120px; padding:4px 8px; border:1px solid var(--accent); border-radius:6px; font-size:13px; font-family:'SF Mono','Fira Code',monospace; font-weight:700; color:var(--accent); background:var(--accent-dim); outline:none; }
+  .bs-edit-input:focus { box-shadow:0 0 0 2px rgba(0,176,212,0.2); }
+  .bs-add-btn { background:none; border:1px solid var(--border); border-radius:6px; cursor:pointer; font-size:12px; color:var(--text-dim); padding:2px 8px; transition:all .15s; display:inline-flex; align-items:center; gap:4px; }
+  .bs-add-btn:hover { background:var(--surface2); color:var(--text); border-color:var(--accent); }
+  .bs-card-actions { display:flex; gap:2px; margin-left:8px; }
+  .bs-card-actions button { background:none; border:none; cursor:pointer; font-size:12px; color:var(--text-dim); padding:2px 4px; border-radius:4px; transition:all .15s; opacity:0; }
+  .bs-card:hover .bs-card-actions button, .bs-liab-card:hover .bs-card-actions button { opacity:1; }
+  .bs-card-actions button:hover { background:var(--surface2); color:var(--text); }
+  .bs-card-actions button.delete:hover { color:var(--red); }
 
   /* Liabilities */
   .bs-liab-card { background:var(--surface); border:1px solid var(--border); border-radius:10px; padding:14px; margin-bottom:10px; }
@@ -253,6 +266,23 @@
 
   .bs-sub-header { font-size:12px; font-weight:700; color:var(--text-dim); margin-bottom:10px; text-transform:uppercase; letter-spacing:.5px; display:flex; align-items:center; gap:8px; }
   .bs-sub-header::after { content:''; flex:1; height:1px; background:var(--border); }
+
+  /* ── Modal ── */
+  .modal-overlay { position:fixed; inset:0; background:rgba(0,0,0,.4); z-index:500; display:flex; align-items:center; justify-content:center; opacity:0; pointer-events:none; transition:opacity .2s; }
+  .modal-overlay.open { opacity:1; pointer-events:auto; }
+  .modal { background:var(--surface); border:1px solid var(--border); border-radius:16px; padding:28px; max-width:480px; width:90%; box-shadow:0 20px 60px rgba(0,0,0,.12); transform:translateY(10px); transition:transform .2s; }
+  .modal-overlay.open .modal { transform:translateY(0); }
+  .modal h3 { font-size:16px; font-weight:700; margin-bottom:16px; }
+  .modal label { display:block; font-size:11px; font-weight:600; color:var(--text-dim); text-transform:uppercase; letter-spacing:.3px; margin-bottom:4px; margin-top:12px; }
+  .modal input, .modal select { width:100%; padding:9px 12px; background:var(--surface2); border:1px solid var(--border); border-radius:8px; color:var(--text); font-size:13px; }
+  .modal input:focus, .modal select:focus { outline:none; border-color:var(--accent); }
+  .modal-actions { display:flex; gap:10px; margin-top:20px; justify-content:flex-end; }
+  .modal-actions button { padding:9px 18px; border-radius:8px; font-size:13px; font-weight:600; cursor:pointer; border:1px solid var(--border); background:var(--surface); color:var(--text-dim); transition:all .15s; }
+  .modal-actions button:hover { background:var(--surface2); }
+  .modal-actions button.primary { background:var(--accent); border-color:var(--accent); color:#fff; }
+  .modal-actions button.primary:hover { background:#009ab8; }
+  .modal-actions button.danger { background:var(--red); border-color:var(--red); color:#fff; }
+  .modal-actions button.danger:hover { background:var(--red-dark); }
 </style>
 </head>
 <body>
@@ -316,13 +346,13 @@
     </div>
 
     <!-- Investments -->
-    <div class="bs-sub-header">Investments</div>
+    <div class="bs-sub-header">Investments <button class="bs-add-btn" onclick="openAddInvestment()">+ Add</button></div>
     <div class="bs-grid" id="bsInvestments">
       <div class="loading-state"><div class="spinner"></div><br>Loading…</div>
     </div>
 
     <!-- Liabilities -->
-    <div class="bs-sub-header">Liabilities</div>
+    <div class="bs-sub-header">Liabilities <button class="bs-add-btn" onclick="openAddLiability()">+ Add</button></div>
     <div id="bsLiabilities">
       <div class="loading-state"><div class="spinner"></div><br>Loading…</div>
     </div>
@@ -428,6 +458,11 @@
     <textarea class="chat-input" id="chatInput" rows="1" placeholder="Tell me about a transaction..." onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();sendChat();}"></textarea>
     <button class="chat-send" id="chatSend" onclick="sendChat()">Send</button>
   </div>
+</div>
+
+<!-- Modal -->
+<div class="modal-overlay" id="modalOverlay" onclick="if(event.target===this)closeModal()">
+  <div class="modal" id="modalContent"></div>
 </div>
 
 <!-- Local dev: config.js sets window.AIRTABLE_TOKEN (gitignored, won't exist in prod) -->
@@ -610,7 +645,10 @@ async function loadData() {
     allRecords = raw.filter(r => {
       const acctNum = String(getAccountNumber(r)).trim();
       const acctName = getAccountName(r).toUpperCase().trim();
-      return includeNums.has(acctNum) || includeNames.has(acctName);
+      if (!includeNums.has(acctNum) && !includeNames.has(acctName)) return false;
+      // Only include 2026+ data
+      const d = getDate(r);
+      return d.getFullYear() >= 2026;
     });
     console.log(`Loaded ${raw.length} records, filtered to ${allRecords.length} corporate accounts`);
     bar.className = 'loading-bar done';
@@ -1485,7 +1523,7 @@ function renderBalanceSheet() {
     const value = valuation || unreturned || contributed;
     investmentsTotal += value;
 
-    return { name, ownership, committed, contributed, distributed, unreturned, valuation, netEquity, status, value };
+    return { id: r.id, name, ownership, committed, contributed, distributed, unreturned, valuation, netEquity, status, value };
   });
 
   // Liabilities total (USD equivalent)
@@ -1511,7 +1549,7 @@ function renderBalanceSheet() {
     }
     liabilitiesTotal += usdValue;
 
-    return { lender, deal, principal, currency, usdEquiv, maturity, status, notes, usdValue };
+    return { id: r.id, lender, deal, principal, currency, usdEquiv, maturity, status, notes, usdValue };
   });
 
   const totalAssets = cash + investmentsTotal;
@@ -1542,15 +1580,18 @@ function renderBalanceSheet() {
     invContainer.innerHTML = '<p style="color:var(--text-dim);padding:16px;text-align:center;">No investments found.</p>';
   } else {
     invContainer.innerHTML = invCards.map(inv => {
-      const ownershipStr = inv.ownership ? `${(inv.ownership * 100).toFixed(2)}%` : (typeof inv.ownership === 'number' && inv.ownership > 1 ? `${inv.ownership.toFixed(2)}%` : '—');
-      // Check if ownership is already a percentage (> 1) or a decimal
       const ownershipDisplay = inv.ownership > 1 ? `${inv.ownership.toFixed(2)}%` : (inv.ownership > 0 ? `${(inv.ownership * 100).toFixed(2)}%` : '—');
-      const contributedPct = inv.committed > 0 ? Math.round(inv.contributed / inv.committed * 100) : 100;
       return `
         <div class="bs-card">
           <div class="bs-card-header">
             <div class="bs-card-title">${inv.name}</div>
-            <div class="bs-card-ownership">${ownershipDisplay} equity</div>
+            <div style="display:flex;align-items:center;gap:4px;">
+              <div class="bs-card-ownership">${ownershipDisplay} equity</div>
+              <div class="bs-card-actions">
+                <button title="Edit" onclick="openEditInvestment('${inv.id}')">✏️</button>
+                <button class="delete" title="Delete" onclick="deleteInvestment('${inv.id}','${inv.name.replace(/'/g,"\\'")}')">🗑️</button>
+              </div>
+            </div>
           </div>
           <div class="bs-card-metrics">
             <div class="bs-metric">
@@ -1561,6 +1602,13 @@ function renderBalanceSheet() {
               <div class="bs-metric-label">Distributed</div>
               <div class="bs-metric-value green">${fmt(inv.distributed)}</div>
             </div>
+          </div>
+          <div class="bs-card-asset-row">
+            <div>
+              <div class="bs-metric-label">Asset Value</div>
+              <div class="bs-asset-value" id="av-${inv.id}">${fmt(inv.value)}</div>
+            </div>
+            <button class="bs-edit-btn" id="avBtn-${inv.id}" onclick="editAssetValue('${inv.id}', ${inv.value})" title="Edit value">✏️</button>
           </div>
         </div>`;
     }).join('');
@@ -1598,7 +1646,13 @@ function renderBalanceSheet() {
       return `
         <div class="bs-liab-card">
           <div class="bs-liab-header">
-            <div class="bs-liab-title">${l.lender}</div>
+            <div style="display:flex;align-items:center;gap:4px;">
+              <div class="bs-liab-title">${l.lender}</div>
+              <div class="bs-card-actions">
+                <button title="Edit" onclick="openEditLiability('${l.id}')">✏️</button>
+                <button class="delete" title="Delete" onclick="deleteLiability('${l.id}','${l.lender.replace(/'/g,"\\'")}')">🗑️</button>
+              </div>
+            </div>
             <div class="bs-liab-amount">${amtStr}</div>
           </div>
           <div class="bs-liab-details">
@@ -1610,6 +1664,307 @@ function renderBalanceSheet() {
         </div>`;
     }).join('');
   }
+}
+
+// ── Modal helpers ──
+function openModal(html) {
+  document.getElementById('modalContent').innerHTML = html;
+  document.getElementById('modalOverlay').classList.add('open');
+}
+
+function closeModal() {
+  document.getElementById('modalOverlay').classList.remove('open');
+}
+
+// ── Asset Value inline edit ──
+function editAssetValue(recordId, currentValue) {
+  const el = document.getElementById(`av-${recordId}`);
+  const btnEl = document.getElementById(`avBtn-${recordId}`);
+  const numVal = Math.round(currentValue);
+  el.innerHTML = `<input class="bs-edit-input" id="avInput-${recordId}" type="text" value="${numVal}" onkeydown="if(event.key==='Enter')saveAssetValue('${recordId}');if(event.key==='Escape'){loadBalanceSheet();}">`;
+  btnEl.innerHTML = '✓';
+  btnEl.onclick = () => saveAssetValue(recordId);
+  const inp = document.getElementById(`avInput-${recordId}`);
+  inp.focus();
+  inp.select();
+}
+
+async function saveAssetValue(recordId) {
+  const inp = document.getElementById(`avInput-${recordId}`);
+  const val = parseFloat(inp.value.replace(/[^0-9.-]/g, ''));
+  if (isNaN(val)) { showToast('Invalid number'); return; }
+  const token = getToken();
+  try {
+    const resp = await fetch(`https://api.airtable.com/v0/${BASE_ID}/${INVESTMENTS_TABLE}/${recordId}`, {
+      method: 'PATCH',
+      headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ fields: { [INV_FIELDS.valuation]: val } })
+    });
+    if (!resp.ok) throw new Error(`Airtable ${resp.status}`);
+    showToast('Asset value updated');
+    await loadBalanceSheet();
+  } catch(e) { showToast('Error: ' + e.message); }
+}
+
+// ── Investment CRUD ──
+function openAddInvestment() {
+  openModal(`
+    <h3>Add Investment</h3>
+    <label>Investment Name</label>
+    <input id="invName" placeholder="e.g. 61 South Paramus">
+    <label>Ownership %</label>
+    <input id="invOwnership" type="number" step="0.01" placeholder="e.g. 15.17">
+    <label>Contributed ($)</label>
+    <input id="invContributed" type="number" step="0.01" placeholder="e.g. 4780417">
+    <label>Distributed ($)</label>
+    <input id="invDistributed" type="number" step="0.01" placeholder="0" value="0">
+    <label>Asset Value ($)</label>
+    <input id="invValuation" type="number" step="0.01" placeholder="Leave blank to use contributed">
+    <div class="modal-actions">
+      <button onclick="closeModal()">Cancel</button>
+      <button class="primary" onclick="saveNewInvestment()">Add</button>
+    </div>
+  `);
+}
+
+async function saveNewInvestment() {
+  const name = document.getElementById('invName').value.trim();
+  const ownership = parseFloat(document.getElementById('invOwnership').value) || 0;
+  const contributed = parseFloat(document.getElementById('invContributed').value) || 0;
+  const distributed = parseFloat(document.getElementById('invDistributed').value) || 0;
+  const valuation = parseFloat(document.getElementById('invValuation').value) || null;
+  if (!name) { showToast('Name required'); return; }
+  const token = getToken();
+  const fields = {
+    [INV_FIELDS.name]: name,
+    [INV_FIELDS.ownership]: ownership,
+    [INV_FIELDS.contributed]: contributed,
+    [INV_FIELDS.distributed]: distributed
+  };
+  if (valuation) fields[INV_FIELDS.valuation] = valuation;
+  try {
+    const resp = await fetch(`https://api.airtable.com/v0/${BASE_ID}/${INVESTMENTS_TABLE}`, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ fields })
+    });
+    if (!resp.ok) throw new Error(`Airtable ${resp.status}`);
+    closeModal();
+    showToast('Investment added');
+    await loadBalanceSheet();
+  } catch(e) { showToast('Error: ' + e.message); }
+}
+
+function openEditInvestment(recordId) {
+  const r = bsInvestments.find(rec => rec.id === recordId);
+  if (!r) return;
+  const f = r.fields;
+  const name = f[INV_FIELDS.name] || f['Investment'] || '';
+  const ownership = f[INV_FIELDS.ownership] || f['Ownership %'] || 0;
+  const contributed = f[INV_FIELDS.contributed] || f['Contributed'] || 0;
+  const distributed = f[INV_FIELDS.distributed] || f['Distributed'] || 0;
+  const valuation = f[INV_FIELDS.valuation] || f['Valuation'] || '';
+  openModal(`
+    <h3>Edit Investment</h3>
+    <label>Investment Name</label>
+    <input id="invName" value="${name}">
+    <label>Ownership %</label>
+    <input id="invOwnership" type="number" step="0.01" value="${ownership}">
+    <label>Contributed ($)</label>
+    <input id="invContributed" type="number" step="0.01" value="${contributed}">
+    <label>Distributed ($)</label>
+    <input id="invDistributed" type="number" step="0.01" value="${distributed}">
+    <label>Asset Value ($)</label>
+    <input id="invValuation" type="number" step="0.01" value="${valuation}">
+    <div class="modal-actions">
+      <button onclick="closeModal()">Cancel</button>
+      <button class="primary" onclick="saveEditInvestment('${recordId}')">Save</button>
+    </div>
+  `);
+}
+
+async function saveEditInvestment(recordId) {
+  const name = document.getElementById('invName').value.trim();
+  const ownership = parseFloat(document.getElementById('invOwnership').value) || 0;
+  const contributed = parseFloat(document.getElementById('invContributed').value) || 0;
+  const distributed = parseFloat(document.getElementById('invDistributed').value) || 0;
+  const valuation = parseFloat(document.getElementById('invValuation').value) || null;
+  if (!name) { showToast('Name required'); return; }
+  const token = getToken();
+  const fields = {
+    [INV_FIELDS.name]: name,
+    [INV_FIELDS.ownership]: ownership,
+    [INV_FIELDS.contributed]: contributed,
+    [INV_FIELDS.distributed]: distributed,
+    [INV_FIELDS.valuation]: valuation || 0
+  };
+  try {
+    const resp = await fetch(`https://api.airtable.com/v0/${BASE_ID}/${INVESTMENTS_TABLE}/${recordId}`, {
+      method: 'PATCH',
+      headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ fields })
+    });
+    if (!resp.ok) throw new Error(`Airtable ${resp.status}`);
+    closeModal();
+    showToast('Investment updated');
+    await loadBalanceSheet();
+  } catch(e) { showToast('Error: ' + e.message); }
+}
+
+async function deleteInvestment(recordId, name) {
+  openModal(`
+    <h3>Delete Investment</h3>
+    <p style="margin-top:8px;color:var(--text-dim);font-size:14px;">Are you sure you want to delete <strong>${name}</strong>? This cannot be undone.</p>
+    <div class="modal-actions">
+      <button onclick="closeModal()">Cancel</button>
+      <button class="danger" onclick="confirmDeleteInvestment('${recordId}')">Delete</button>
+    </div>
+  `);
+}
+
+async function confirmDeleteInvestment(recordId) {
+  const token = getToken();
+  try {
+    const resp = await fetch(`https://api.airtable.com/v0/${BASE_ID}/${INVESTMENTS_TABLE}/${recordId}`, {
+      method: 'DELETE',
+      headers: { Authorization: `Bearer ${token}` }
+    });
+    if (!resp.ok) throw new Error(`Airtable ${resp.status}`);
+    closeModal();
+    showToast('Investment deleted');
+    await loadBalanceSheet();
+  } catch(e) { showToast('Error: ' + e.message); }
+}
+
+// ── Liability CRUD ──
+function openAddLiability() {
+  openModal(`
+    <h3>Add Liability</h3>
+    <label>Lender / Description</label>
+    <input id="liabLender" placeholder="e.g. Six Fields - Deal Name">
+    <label>Principal Amount</label>
+    <input id="liabPrincipal" type="number" step="0.01" placeholder="e.g. 4000000">
+    <label>Currency</label>
+    <select id="liabCurrency"><option value="USD" selected>USD</option><option value="JPY">JPY</option></select>
+    <label>Maturity Date</label>
+    <input id="liabMaturity" type="date">
+    <label>Notes</label>
+    <input id="liabNotes" placeholder="Optional">
+    <div class="modal-actions">
+      <button onclick="closeModal()">Cancel</button>
+      <button class="primary" onclick="saveNewLiability()">Add</button>
+    </div>
+  `);
+}
+
+async function saveNewLiability() {
+  const lender = document.getElementById('liabLender').value.trim();
+  const principal = parseFloat(document.getElementById('liabPrincipal').value) || 0;
+  const currency = document.getElementById('liabCurrency').value;
+  const maturity = document.getElementById('liabMaturity').value;
+  const notes = document.getElementById('liabNotes').value.trim();
+  if (!lender) { showToast('Lender required'); return; }
+  const token = getToken();
+  const fields = {
+    [LIAB_FIELDS.lender]: lender,
+    [LIAB_FIELDS.principal]: principal,
+    [LIAB_FIELDS.currency]: { name: currency },
+    [LIAB_FIELDS.status]: { name: 'Active' }
+  };
+  if (maturity) fields[LIAB_FIELDS.maturity] = maturity;
+  if (notes) fields[LIAB_FIELDS.notes] = notes;
+  try {
+    const resp = await fetch(`https://api.airtable.com/v0/${BASE_ID}/${LIABILITIES_TABLE}`, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ fields })
+    });
+    if (!resp.ok) { const txt = await resp.text(); throw new Error(`Airtable ${resp.status}: ${txt}`); }
+    closeModal();
+    showToast('Liability added');
+    await loadBalanceSheet();
+  } catch(e) { showToast('Error: ' + e.message); }
+}
+
+function openEditLiability(recordId) {
+  const r = bsLiabilities.find(rec => rec.id === recordId);
+  if (!r) return;
+  const lender = getLiabField(r, 'lender') || '';
+  const principal = getLiabField(r, 'principal') || 0;
+  const currency = getLiabField(r, 'currency');
+  const currName = typeof currency === 'object' ? currency.name : (currency || 'USD');
+  const maturity = getLiabField(r, 'maturity') || '';
+  const notes = getLiabField(r, 'notes') || '';
+  openModal(`
+    <h3>Edit Liability</h3>
+    <label>Lender / Description</label>
+    <input id="liabLender" value="${lender}">
+    <label>Principal Amount</label>
+    <input id="liabPrincipal" type="number" step="0.01" value="${principal}">
+    <label>Currency</label>
+    <select id="liabCurrency"><option value="USD" ${currName==='USD'?'selected':''}>USD</option><option value="JPY" ${currName==='JPY'?'selected':''}>JPY</option></select>
+    <label>Maturity Date</label>
+    <input id="liabMaturity" type="date" value="${maturity}">
+    <label>Notes</label>
+    <input id="liabNotes" value="${notes}">
+    <div class="modal-actions">
+      <button onclick="closeModal()">Cancel</button>
+      <button class="primary" onclick="saveEditLiability('${recordId}')">Save</button>
+    </div>
+  `);
+}
+
+async function saveEditLiability(recordId) {
+  const lender = document.getElementById('liabLender').value.trim();
+  const principal = parseFloat(document.getElementById('liabPrincipal').value) || 0;
+  const currency = document.getElementById('liabCurrency').value;
+  const maturity = document.getElementById('liabMaturity').value;
+  const notes = document.getElementById('liabNotes').value.trim();
+  if (!lender) { showToast('Lender required'); return; }
+  const token = getToken();
+  const fields = {
+    [LIAB_FIELDS.lender]: lender,
+    [LIAB_FIELDS.principal]: principal,
+    [LIAB_FIELDS.currency]: { name: currency }
+  };
+  if (maturity) fields[LIAB_FIELDS.maturity] = maturity;
+  fields[LIAB_FIELDS.notes] = notes;
+  try {
+    const resp = await fetch(`https://api.airtable.com/v0/${BASE_ID}/${LIABILITIES_TABLE}/${recordId}`, {
+      method: 'PATCH',
+      headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ fields })
+    });
+    if (!resp.ok) throw new Error(`Airtable ${resp.status}`);
+    closeModal();
+    showToast('Liability updated');
+    await loadBalanceSheet();
+  } catch(e) { showToast('Error: ' + e.message); }
+}
+
+async function deleteLiability(recordId, name) {
+  openModal(`
+    <h3>Delete Liability</h3>
+    <p style="margin-top:8px;color:var(--text-dim);font-size:14px;">Are you sure you want to delete <strong>${name}</strong>? This cannot be undone.</p>
+    <div class="modal-actions">
+      <button onclick="closeModal()">Cancel</button>
+      <button class="danger" onclick="confirmDeleteLiability('${recordId}')">Delete</button>
+    </div>
+  `);
+}
+
+async function confirmDeleteLiability(recordId) {
+  const token = getToken();
+  try {
+    const resp = await fetch(`https://api.airtable.com/v0/${BASE_ID}/${LIABILITIES_TABLE}/${recordId}`, {
+      method: 'DELETE',
+      headers: { Authorization: `Bearer ${token}` }
+    });
+    if (!resp.ok) throw new Error(`Airtable ${resp.status}`);
+    closeModal();
+    showToast('Liability deleted');
+    await loadBalanceSheet();
+  } catch(e) { showToast('Error: ' + e.message); }
 }
 </script>
 </body>
