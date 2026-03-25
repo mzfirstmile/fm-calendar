@@ -372,7 +372,25 @@ let cfMode = 'monthly';
 let selectedPeriodIndex = -1; // -1 means latest
 let periods = [];
 
-// ── Password Check ──
+// ── Password Check (24-hour session) ──
+const SESSION_DURATION = 24 * 60 * 60 * 1000; // 24 hours in ms
+
+function isSessionValid() {
+  const ts = localStorage.getItem('_exec_auth_ts');
+  if (!ts) return false;
+  return (Date.now() - parseInt(ts, 10)) < SESSION_DURATION;
+}
+
+function setSession() {
+  localStorage.setItem('_exec_auth_ts', Date.now().toString());
+}
+
+// Auto-unlock if session still valid
+if (isSessionValid()) {
+  document.getElementById('gateOverlay').classList.add('hidden');
+  initDashboard();
+}
+
 document.getElementById('pwInput').addEventListener('keydown', e => { if(e.key==='Enter') checkPassword(); });
 
 async function checkPassword() {
@@ -380,6 +398,7 @@ async function checkPassword() {
 
   // Local dev: compare plaintext from config.js
   if (window.EXEC_PASSWORD && pw === window.EXEC_PASSWORD) {
+    setSession();
     document.getElementById('gateOverlay').classList.add('hidden');
     initDashboard();
     return;
@@ -393,6 +412,7 @@ async function checkPassword() {
   const hashHex = hashArray.map(b => b.toString(16).padStart(2,'0')).join('');
 
   if (hashHex === PW_HASH) {
+    setSession();
     document.getElementById('gateOverlay').classList.add('hidden');
     initDashboard();
   } else {
