@@ -354,9 +354,9 @@
   <!-- Summary Cards -->
   <div class="summary-grid" id="summaryGrid">
     <div class="summary-card"><div class="value green" id="totalIncome">—</div><div class="label">Income</div></div>
-    <div class="summary-card"><div class="value red" id="totalExpenses">—</div><div class="label">Expenses</div></div>
-    <div class="summary-card"><div class="value" id="netSavings">—</div><div class="label">Total Savings</div></div>
-    <div class="summary-card"><div class="value" id="savingsRate">—</div><div class="label">Savings Rate</div></div>
+    <div class="summary-card"><div class="value red" id="totalExpenses">—</div><div class="label">Operating Expenses</div></div>
+    <div class="summary-card"><div class="value" id="netIncome">—</div><div class="label">Net Income</div></div>
+    <div class="summary-card"><div class="value" id="cashFlow">—</div><div class="label">Cash Flow</div></div>
   </div>
 
   <!-- Income Breakdown -->
@@ -367,12 +367,28 @@
     <div id="incomeRows"></div>
   </div>
 
-  <!-- Expense Breakdown -->
-  <div class="cat-section" id="expenseSection">
+  <!-- Operating Expenses -->
+  <div class="cat-section" id="opexSection">
     <div class="cat-section-header">
-      <h3>Expenses</h3>
+      <h3>Operating Expenses</h3>
     </div>
-    <div id="expenseRows"></div>
+    <div id="opexRows"></div>
+  </div>
+
+  <!-- Owner Distributions -->
+  <div class="cat-section" id="distroSection">
+    <div class="cat-section-header">
+      <h3>Owner Distributions</h3>
+    </div>
+    <div id="distroRows"></div>
+  </div>
+
+  <!-- Investment Contributions -->
+  <div class="cat-section" id="investSection">
+    <div class="cat-section-header">
+      <h3>Investment Contributions</h3>
+    </div>
+    <div id="investRows"></div>
   </div>
 
   <!-- Drill-down -->
@@ -463,7 +479,9 @@ const CAT_ICONS = {
   'AM Partner Payout': '🤝',
   'PM Expenses': '🔧',
   'Software/Services': '💻',
-  'Other Operating': '📋'
+  'Other Operating': '📋',
+  'Owner Distributions': '💸',
+  'Investment Contributions': '🏗️'
 };
 
 // All possible categories for the dropdown
@@ -657,7 +675,11 @@ function categorize(record) {
     const oc = categoryOverrides[record.id];
     const isIncome = INCOME_CATEGORIES.includes(oc);
     const isExcluded = oc === 'Internal Transfer' || oc === 'Payroll Reimbursement';
+    const isDistribution = oc === 'AM Partner Payout' || oc === 'Owner Distributions';
+    const isInvestment = oc === 'Investment Contributions' || oc === 'Investor Contribution (Pass-Through)';
     if (isExcluded) return { category: oc === 'Payroll Reimbursement' ? 'payroll_offset' : 'excluded', type: oc };
+    if (isDistribution) return { category: 'distribution', type: oc };
+    if (isInvestment) return { category: 'investment', type: oc };
     return { category: isIncome ? 'income' : 'expense', type: oc };
   }
 
@@ -675,9 +697,9 @@ function categorize(record) {
     return { category: 'income', type: 'Asset Management Fee Income' };
   }
 
-  // AM Partner payout from Member accounts
+  // AM Partner payout from Member accounts → Owner Distribution
   if (MEMBER_ACCOUNTS.some(m => acctName.toUpperCase().includes(m.toUpperCase())) && amount < 0 && !isTransfer) {
-    return { category: 'expense', type: 'AM Partner Payout' };
+    return { category: 'distribution', type: 'AM Partner Payout' };
   }
 
   // PM Fees — credits in Management account
@@ -732,7 +754,18 @@ function categorize(record) {
     if (desc.includes('CORPORATION SERV') || desc.includes('LEGAL')) return { category: 'expense', type: 'Legal/Corp Services' };
     if (desc.includes('NYS DTF') || desc.includes('NJ WEB PMT') || desc.includes('TAX')) return { category: 'expense', type: 'Taxes' };
     if (desc.includes('JPMORGAN') || (desc.includes('CHASE') && !desc.includes('CREDIT'))) return { category: 'expense', type: 'Banking' };
-    if (desc.includes('WIRE') && amount < 0) return { category: 'expense', type: 'Wire Payments' };
+    // Outbound wires — classify by description
+    if (desc.includes('WIRE') && amount < 0) {
+      // Investment contributions: wires to deals/properties/funds
+      if (desc.includes('PARAMUS') || desc.includes('KEMBLE') || desc.includes('LIFETIME') || desc.includes('PLAZA') || desc.includes('RED') || desc.includes('CAPITAL CALL') || desc.includes('CONTRIBUTION') || desc.includes('INVESTMENT')) {
+        return { category: 'investment', type: 'Investment Contributions' };
+      }
+      // Distribution wires: partner payouts
+      if (desc.includes('DISTRIBUTION') || desc.includes('DISTRIB') || desc.includes('PAYOUT') || desc.includes('PARTNER')) {
+        return { category: 'distribution', type: 'Owner Distributions' };
+      }
+      return { category: 'expense', type: 'Wire Payments' };
+    }
     if (desc.includes('CHECK') || desc.includes('Check')) return { category: 'expense', type: 'Checks' };
     if (desc.includes('APPFOLIO') && amount < 0) return { category: 'expense', type: 'Software/Services' };
 
@@ -824,9 +857,11 @@ function nextPeriod() {
 
 // ── Compute period financials ──
 function computePeriod(records) {
-  let totalIncome = 0, totalExpense = 0, payrollReimb = 0;
+  let totalIncome = 0, totalOpex = 0, totalDistributions = 0, totalInvestments = 0, payrollReimb = 0;
   const incomeBuckets = {};
-  const expenseBuckets = {};
+  const opexBuckets = {};       // Operating expenses
+  const distroBuckets = {};     // Owner distributions
+  const investBuckets = {};     // Investment contributions
   const excludedBuckets = {};
 
   INCOME_CATEGORIES.forEach(c => incomeBuckets[c] = { total: 0, count: 0, records: [] });
@@ -842,11 +877,23 @@ function computePeriod(records) {
       incomeBuckets[type].count++;
       incomeBuckets[type].records.push(r);
     } else if (category === 'expense') {
-      totalExpense += amount;
-      if (!expenseBuckets[type]) expenseBuckets[type] = { total: 0, count: 0, records: [] };
-      expenseBuckets[type].total += amount;
-      expenseBuckets[type].count++;
-      expenseBuckets[type].records.push(r);
+      totalOpex += amount;
+      if (!opexBuckets[type]) opexBuckets[type] = { total: 0, count: 0, records: [] };
+      opexBuckets[type].total += amount;
+      opexBuckets[type].count++;
+      opexBuckets[type].records.push(r);
+    } else if (category === 'distribution') {
+      totalDistributions += amount;
+      if (!distroBuckets[type]) distroBuckets[type] = { total: 0, count: 0, records: [] };
+      distroBuckets[type].total += amount;
+      distroBuckets[type].count++;
+      distroBuckets[type].records.push(r);
+    } else if (category === 'investment') {
+      totalInvestments += amount;
+      if (!investBuckets[type]) investBuckets[type] = { total: 0, count: 0, records: [] };
+      investBuckets[type].total += amount;
+      investBuckets[type].count++;
+      investBuckets[type].records.push(r);
     } else if (category === 'payroll_offset') {
       payrollReimb += amount;
       if (!excludedBuckets[type]) excludedBuckets[type] = { total: 0, count: 0 };
@@ -859,12 +906,19 @@ function computePeriod(records) {
     }
   });
 
-  // Net payroll: add reimbursement offset to Payroll expense
-  const netExpense = totalExpense + payrollReimb;
-  const netSavings = totalIncome + netExpense;
-  const savingsRate = totalIncome > 0 ? (netSavings / totalIncome * 100) : 0;
+  // Net payroll: add reimbursement offset to opex
+  const netOpex = totalOpex + payrollReimb;
+  // Net Income = Income - Operating Expenses
+  const netIncome = totalIncome + netOpex;
+  // Cash Flow = Net Income + Distributions + Investments (all negative values)
+  const cashFlow = netIncome + totalDistributions + totalInvestments;
 
-  return { totalIncome, totalExpense: Math.abs(totalExpense), netExpense, payrollReimb, netSavings, savingsRate, incomeBuckets, expenseBuckets, excludedBuckets };
+  return {
+    totalIncome, totalOpex: Math.abs(totalOpex), netOpex, payrollReimb,
+    totalDistributions: Math.abs(totalDistributions), totalInvestments: Math.abs(totalInvestments),
+    netIncome, cashFlow,
+    incomeBuckets, opexBuckets, distroBuckets, investBuckets, excludedBuckets
+  };
 }
 
 // ── Render All ──
@@ -883,7 +937,8 @@ function renderChart() {
   const periodData = periods.map((p, i) => {
     const recs = getRecordsForPeriod(p);
     const comp = computePeriod(recs);
-    return { ...p, income: comp.totalIncome, expense: comp.totalExpense, net: comp.netSavings, idx: i };
+    const totalOut = comp.totalOpex + comp.totalDistributions + comp.totalInvestments;
+    return { ...p, income: comp.totalIncome, expense: totalOut, net: comp.cashFlow, netIncome: comp.netIncome, idx: i };
   });
 
   // Cumulative line
@@ -1008,27 +1063,35 @@ function renderPeriodDashboard() {
 
   // Summary cards
   document.getElementById('totalIncome').textContent = fmt(comp.totalIncome);
-  document.getElementById('totalExpenses').textContent = fmt(comp.totalExpense);
+  document.getElementById('totalExpenses').textContent = fmt(comp.totalOpex);
 
-  const nsEl = document.getElementById('netSavings');
-  nsEl.textContent = fmt(comp.netSavings);
-  nsEl.className = 'value ' + (comp.netSavings >= 0 ? 'green' : 'red');
+  const niEl = document.getElementById('netIncome');
+  niEl.textContent = fmt(comp.netIncome);
+  niEl.className = 'value ' + (comp.netIncome >= 0 ? 'green' : 'red');
 
-  document.getElementById('savingsRate').textContent = `${Math.round(comp.savingsRate)}%`;
+  const cfEl = document.getElementById('cashFlow');
+  cfEl.textContent = fmt(comp.cashFlow);
+  cfEl.className = 'value ' + (comp.cashFlow >= 0 ? 'green' : 'red');
 
   // Income rows
   renderCategoryRows('incomeRows', comp.incomeBuckets, 'income', comp.totalIncome);
 
-  // Expense rows — add payroll reimbursement into Payroll display
-  const expDisplay = { ...comp.expenseBuckets };
-  if (expDisplay['Payroll'] && comp.payrollReimb > 0) {
-    expDisplay['Payroll'] = {
-      ...expDisplay['Payroll'],
-      total: expDisplay['Payroll'].total + comp.payrollReimb,
-      subNote: `Gross: ${fmtFull(expDisplay['Payroll'].total)} + Reimb: +${fmtFull(comp.payrollReimb)}`
+  // Operating expense rows — add payroll reimbursement into Payroll display
+  const opexDisplay = { ...comp.opexBuckets };
+  if (opexDisplay['Payroll'] && comp.payrollReimb > 0) {
+    opexDisplay['Payroll'] = {
+      ...opexDisplay['Payroll'],
+      total: opexDisplay['Payroll'].total + comp.payrollReimb,
+      subNote: `Gross: ${fmtFull(opexDisplay['Payroll'].total)} + Reimb: +${fmtFull(comp.payrollReimb)}`
     };
   }
-  renderCategoryRows('expenseRows', expDisplay, 'expense', comp.totalExpense);
+  renderCategoryRows('opexRows', opexDisplay, 'expense', comp.totalOpex);
+
+  // Owner distributions
+  renderCategoryRows('distroRows', comp.distroBuckets, 'expense', comp.totalDistributions);
+
+  // Investment contributions
+  renderCategoryRows('investRows', comp.investBuckets, 'expense', comp.totalInvestments);
 
   // Excluded
   const exDiv = document.getElementById('excludedRows');
@@ -1129,13 +1192,17 @@ function openDrilldown(type, cssClass) {
   // Show drilldown, hide category sections
   document.getElementById('drilldown').classList.add('show');
   document.getElementById('incomeSection').style.display = 'none';
-  document.getElementById('expenseSection').style.display = 'none';
+  document.getElementById('opexSection').style.display = 'none';
+  document.getElementById('distroSection').style.display = 'none';
+  document.getElementById('investSection').style.display = 'none';
 }
 
 function closeDrilldown() {
   document.getElementById('drilldown').classList.remove('show');
   document.getElementById('incomeSection').style.display = '';
-  document.getElementById('expenseSection').style.display = '';
+  document.getElementById('opexSection').style.display = '';
+  document.getElementById('distroSection').style.display = '';
+  document.getElementById('investSection').style.display = '';
 }
 
 function changeCategory(recordId, newCategory) {
