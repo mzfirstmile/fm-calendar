@@ -300,7 +300,8 @@
 <script src="config.js" onerror=""></script>
 <script>
 // ── Constants ──
-const PW_HASH = 'e3011a60c3cf5e71787c994f58494a8ce8bb9ed7479e11db1498054c2fec7219';
+// Production: hash injected at build time. Local dev: computed from config.js password.
+const PW_HASH = '__EXEC_PW_HASH__';
 const BASE_ID = 'appTXzlQGcpVk3IcU';
 const TABLE_ID = 'tbl9ahPA1hA2hZrv0';
 const MAIN_ACCT = '483101560383';
@@ -376,6 +377,15 @@ document.getElementById('pwInput').addEventListener('keydown', e => { if(e.key==
 
 async function checkPassword() {
   const pw = document.getElementById('pwInput').value;
+
+  // Local dev: compare plaintext from config.js
+  if (window.EXEC_PASSWORD && pw === window.EXEC_PASSWORD) {
+    document.getElementById('gateOverlay').classList.add('hidden');
+    initDashboard();
+    return;
+  }
+
+  // Production: compare SHA-256 hash
   const encoder = new TextEncoder();
   const data = encoder.encode(pw);
   const hashBuffer = await crypto.subtle.digest('SHA-256', data);
@@ -383,7 +393,6 @@ async function checkPassword() {
   const hashHex = hashArray.map(b => b.toString(16).padStart(2,'0')).join('');
 
   if (hashHex === PW_HASH) {
-    sessionStorage.setItem('_exec_auth', '1');
     document.getElementById('gateOverlay').classList.add('hidden');
     initDashboard();
   } else {
@@ -405,11 +414,6 @@ function initDashboard() {
   try { categoryOverrides = JSON.parse(localStorage.getItem('_exec_cat_overrides') || '{}'); } catch(e) { categoryOverrides = {}; }
 
   loadData();
-}
-
-if (sessionStorage.getItem('_exec_auth') === '1') {
-  document.getElementById('gateOverlay').classList.add('hidden');
-  initDashboard();
 }
 
 // Redraw chart on resize
