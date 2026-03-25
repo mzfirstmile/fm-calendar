@@ -1,0 +1,931 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>First Mile — Executive Dashboard</title>
+<link rel="icon" type="image/png" href="favicon.png">
+<style>
+  :root {
+    --bg: #f5f5f0;
+    --surface: #ffffff;
+    --surface2: #f0f0ea;
+    --border: #e5e5df;
+    --text: #1a1a1a;
+    --text-dim: #7a7a72;
+    --accent: #00b0d4;
+    --accent-dim: rgba(0,176,212,0.08);
+    --green: #2ecc71;
+    --green-dark: #1a9a55;
+    --green-dim: rgba(46,204,113,0.10);
+    --red: #e74c3c;
+    --red-dark: #c0392b;
+    --red-dim: rgba(231,76,60,0.08);
+    --orange: #d4860a;
+    --orange-dim: rgba(212,134,10,0.08);
+    --income-bar: #d4edda;
+    --expense-bar: #f8d7da;
+  }
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: var(--bg); color: var(--text); min-height: 100vh; }
+
+  .loading-bar { height:3px; background:var(--accent); position:fixed; top:0; left:0; width:0; transition:width .3s; z-index:500; }
+  .loading-bar.active { width:60%; }
+  .loading-bar.done { width:100%; opacity:0; transition:width .2s, opacity .5s .3s; }
+
+  /* ── Password Gate ── */
+  .gate-overlay { position:fixed; inset:0; background:var(--bg); z-index:400; display:flex; align-items:center; justify-content:center; }
+  .gate-overlay.hidden { display:none; }
+  .gate-card { background:var(--surface); border:1px solid var(--border); border-radius:16px; padding:40px; max-width:420px; width:90%; box-shadow:0 20px 60px rgba(0,0,0,.06); }
+  .gate-card h2 { font-size:20px; margin-bottom:6px; }
+  .gate-card h2 span { color:var(--accent); }
+  .gate-card .sub { font-size:13px; color:var(--text-dim); margin-bottom:24px; line-height:1.6; }
+  .gate-card label { display:block; font-size:11px; font-weight:600; color:var(--text-dim); text-transform:uppercase; letter-spacing:.3px; margin-bottom:6px; }
+  .gate-card input { width:100%; padding:11px 14px; background:var(--surface2); border:1px solid var(--border); border-radius:8px; color:var(--text); font-size:14px; margin-bottom:16px; }
+  .gate-card input:focus { outline:none; border-color:var(--accent); }
+  .gate-error { color:var(--red); font-size:12px; margin-bottom:12px; display:none; }
+  .gate-error.show { display:block; }
+  .gate-btn { width:100%; padding:11px; border-radius:8px; font-size:13px; font-weight:600; cursor:pointer; border:1px solid var(--accent); background:var(--accent); color:#fff; transition:all .2s; }
+  .gate-btn:hover { background:#009ab8; }
+
+  /* ── Header ── */
+  header { padding:20px 40px; display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:12px; background:var(--surface); border-bottom:1px solid var(--border); }
+  header h1 { font-size:18px; font-weight:600; }
+  header h1 span { color:var(--accent); }
+  .header-right { display:flex; align-items:center; gap:10px; flex-wrap:wrap; }
+  .logo-icon { height:24px; width:auto; margin-right:8px; vertical-align:middle; }
+  .btn { padding:7px 14px; border-radius:7px; font-size:12px; font-weight:600; text-decoration:none; cursor:pointer; border:1px solid var(--border); background:var(--surface); color:var(--text-dim); transition:all .2s; }
+  .btn:hover { background:var(--surface2); color:var(--text); }
+  .btn.accent { color:var(--accent); border-color:rgba(0,176,212,.3); background:var(--accent-dim); }
+
+  /* ── Dashboard ── */
+  .dashboard { padding:0 40px 40px; display:none; max-width:1200px; margin:0 auto; }
+  .dashboard.show { display:block; }
+
+  /* ── Cash Flow Section ── */
+  .cf-section { background:var(--surface); border:1px solid var(--border); border-radius:12px; padding:24px; margin-top:24px; margin-bottom:24px; }
+  .cf-header { display:flex; align-items:center; justify-content:space-between; margin-bottom:20px; }
+  .cf-header h2 { font-size:18px; font-weight:700; }
+  .cf-toggle { display:flex; gap:0; border:1px solid var(--border); border-radius:8px; overflow:hidden; }
+  .cf-toggle button { padding:7px 16px; font-size:12px; font-weight:600; border:none; background:var(--surface); color:var(--text-dim); cursor:pointer; transition:all .15s; border-right:1px solid var(--border); }
+  .cf-toggle button:last-child { border-right:none; }
+  .cf-toggle button.active { background:var(--text); color:#fff; }
+  .cf-toggle button:hover:not(.active) { background:var(--surface2); }
+  .cf-chart { position:relative; width:100%; overflow-x:auto; }
+  .cf-chart svg { display:block; }
+
+  /* ── Period Header ── */
+  .period-header { display:flex; align-items:center; justify-content:space-between; margin-bottom:16px; margin-top:8px; }
+  .period-header h2 { font-size:22px; font-weight:700; }
+  .period-nav { display:flex; gap:8px; align-items:center; }
+  .period-nav button { width:32px; height:32px; border-radius:50%; border:1px solid var(--border); background:var(--surface); cursor:pointer; font-size:16px; color:var(--text-dim); display:flex; align-items:center; justify-content:center; transition:all .15s; }
+  .period-nav button:hover { background:var(--surface2); color:var(--text); }
+
+  /* Summary Cards */
+  .summary-grid { display:grid; grid-template-columns:repeat(4,1fr); gap:16px; margin-bottom:28px; }
+  .summary-card { background:var(--surface); border:1px solid var(--border); border-radius:12px; padding:20px; text-align:center; }
+  .summary-card .value { font-size:24px; font-weight:700; margin-bottom:4px; }
+  .summary-card .value.green { color:var(--green-dark); }
+  .summary-card .value.red { color:var(--red-dark); }
+  .summary-card .label { font-size:11px; font-weight:600; color:var(--text-dim); text-transform:uppercase; letter-spacing:.5px; }
+
+  /* ── Category Sections ── */
+  .cat-section { background:var(--surface); border:1px solid var(--border); border-radius:12px; padding:24px; margin-bottom:20px; }
+  .cat-section-header { display:flex; align-items:center; justify-content:space-between; margin-bottom:18px; }
+  .cat-section-header h3 { font-size:16px; font-weight:700; }
+
+  .cat-row { display:flex; align-items:center; gap:12px; padding:10px 0; cursor:pointer; border-radius:8px; transition:background .15s; margin:0 -8px; padding-left:8px; padding-right:8px; }
+  .cat-row:hover { background:var(--surface2); }
+  .cat-row .cat-icon { width:28px; height:28px; border-radius:8px; display:flex; align-items:center; justify-content:center; font-size:14px; flex-shrink:0; }
+  .cat-row .cat-info { flex:1; min-width:0; }
+  .cat-row .cat-name { font-size:14px; font-weight:500; }
+  .cat-row .cat-bar-wrap { flex:1; height:28px; background:transparent; border-radius:6px; position:relative; min-width:60px; }
+  .cat-row .cat-bar { height:100%; border-radius:6px; transition:width .4s ease; min-width:4px; display:flex; align-items:center; padding-left:10px; }
+  .cat-row .cat-bar .cat-bar-label { font-size:12px; font-weight:600; white-space:nowrap; }
+  .cat-row.income .cat-bar { background:var(--income-bar); }
+  .cat-row.income .cat-bar .cat-bar-label { color:var(--green-dark); }
+  .cat-row.income .cat-icon { background:var(--green-dim); color:var(--green-dark); }
+  .cat-row.expense .cat-bar { background:var(--expense-bar); }
+  .cat-row.expense .cat-bar .cat-bar-label { color:var(--red-dark); }
+  .cat-row.expense .cat-icon { background:var(--red-dim); color:var(--red-dark); }
+  .cat-row .cat-amount { font-size:13px; font-weight:600; white-space:nowrap; text-align:right; min-width:140px; }
+
+  /* ── Drill-down ── */
+  .drilldown { background:var(--surface); border:1px solid var(--border); border-radius:12px; padding:24px; margin-bottom:20px; display:none; }
+  .drilldown.show { display:block; }
+  .drilldown-header { display:flex; align-items:center; justify-content:space-between; margin-bottom:16px; }
+  .drilldown-header h3 { font-size:16px; font-weight:700; }
+  .drilldown-back { padding:6px 14px; border-radius:7px; font-size:12px; font-weight:600; cursor:pointer; border:1px solid var(--border); background:var(--surface); color:var(--text-dim); transition:all .15s; }
+  .drilldown-back:hover { background:var(--surface2); color:var(--text); }
+
+  .txn-list { }
+  .txn-date-group { font-size:12px; font-weight:600; color:var(--text-dim); padding:10px 0 6px; border-bottom:1px solid var(--border); margin-bottom:4px; }
+  .txn-row { display:grid; grid-template-columns:1fr 180px 180px 120px; gap:12px; align-items:center; padding:10px 0; border-bottom:1px solid var(--border); font-size:13px; }
+  .txn-row:last-child { border-bottom:none; }
+  .txn-desc { font-weight:500; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .txn-acct { color:var(--text-dim); font-size:12px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .txn-cat-select { padding:5px 8px; border-radius:6px; border:1px solid var(--border); background:var(--surface2); font-size:12px; color:var(--text); cursor:pointer; max-width:180px; width:100%; }
+  .txn-cat-select:focus { outline:none; border-color:var(--accent); }
+  .txn-amount { text-align:right; font-weight:600; font-family:'SF Mono','Fira Code',monospace; font-size:13px; }
+  .txn-amount.green { color:var(--green-dark); }
+  .txn-amount.red { color:var(--red-dark); }
+
+  /* ── Excluded section ── */
+  .excluded-section { background:var(--surface); border:1px solid var(--border); border-radius:12px; padding:24px; margin-bottom:20px; }
+  .excluded-section h3 { font-size:14px; font-weight:600; color:var(--text-dim); margin-bottom:12px; }
+  .excluded-row { display:flex; justify-content:space-between; padding:6px 0; font-size:13px; color:var(--text-dim); border-bottom:1px solid var(--border); }
+  .excluded-row:last-child { border-bottom:none; }
+
+  /* Responsive */
+  @media (max-width:900px) {
+    .summary-grid { grid-template-columns:repeat(2,1fr); }
+    header, .dashboard { padding-left:20px; padding-right:20px; }
+    .txn-row { grid-template-columns:1fr 120px 100px; }
+    .txn-acct { display:none; }
+  }
+  @media (max-width:600px) {
+    .summary-grid { grid-template-columns:1fr 1fr; }
+    .txn-row { grid-template-columns:1fr 100px; }
+    .txn-cat-select { display:none; }
+  }
+
+  /* Loading spinner */
+  .spinner { display:inline-block; width:16px; height:16px; border:2px solid var(--border); border-top-color:var(--accent); border-radius:50%; animation:spin .6s linear infinite; }
+  @keyframes spin { to { transform:rotate(360deg); } }
+  .loading-state { text-align:center; padding:60px 20px; color:var(--text-dim); font-size:14px; }
+  .loading-state .spinner { width:24px; height:24px; margin-bottom:12px; }
+
+  /* Save toast */
+  .toast { position:fixed; bottom:24px; right:24px; padding:10px 20px; background:var(--text); color:#fff; border-radius:8px; font-size:13px; font-weight:500; opacity:0; transform:translateY(10px); transition:all .3s; z-index:600; pointer-events:none; }
+  .toast.show { opacity:1; transform:translateY(0); }
+</style>
+</head>
+<body>
+
+<div class="loading-bar" id="loadBar"></div>
+<div class="toast" id="toast">Category updated</div>
+
+<!-- Password Gate -->
+<div class="gate-overlay" id="gateOverlay">
+  <div class="gate-card">
+    <h2><img src="favicon.png" class="logo-icon" alt="">Executive <span>Dashboard</span></h2>
+    <p class="sub">Enter the access password to continue.</p>
+    <label>Password</label>
+    <input type="password" id="pwInput" placeholder="Enter password" autofocus>
+    <div class="gate-error" id="gateError">Incorrect password. Try again.</div>
+    <button class="gate-btn" id="gateBtn" onclick="checkPassword()">Unlock</button>
+  </div>
+</div>
+
+
+
+<!-- Dashboard -->
+<header style="display:none" id="mainHeader">
+  <h1><img src="favicon.png" class="logo-icon" alt="">Executive <span>Dashboard</span></h1>
+  <div class="header-right">
+    <button class="btn" onclick="refreshData()">Refresh</button>
+    <a href="index.html" class="btn">Calendar</a>
+  </div>
+</header>
+
+<div class="dashboard" id="dashboard">
+  <!-- Cash Flow Chart -->
+  <div class="cf-section">
+    <div class="cf-header">
+      <h2>Cash Flow</h2>
+      <div class="cf-toggle">
+        <button class="active" onclick="setCfMode('monthly')">Monthly</button>
+        <button onclick="setCfMode('quarterly')">Quarterly</button>
+        <button onclick="setCfMode('yearly')">Yearly</button>
+      </div>
+    </div>
+    <div class="cf-chart" id="cfChart"></div>
+  </div>
+
+  <!-- Period Header -->
+  <div class="period-header">
+    <h2 id="periodTitle">March 2026</h2>
+    <div class="period-nav">
+      <button onclick="prevPeriod()">&#8592;</button>
+      <button onclick="nextPeriod()">&#8594;</button>
+    </div>
+  </div>
+
+  <!-- Summary Cards -->
+  <div class="summary-grid" id="summaryGrid">
+    <div class="summary-card"><div class="value green" id="totalIncome">—</div><div class="label">Income</div></div>
+    <div class="summary-card"><div class="value red" id="totalExpenses">—</div><div class="label">Expenses</div></div>
+    <div class="summary-card"><div class="value" id="netSavings">—</div><div class="label">Total Savings</div></div>
+    <div class="summary-card"><div class="value" id="savingsRate">—</div><div class="label">Savings Rate</div></div>
+  </div>
+
+  <!-- Income Breakdown -->
+  <div class="cat-section" id="incomeSection">
+    <div class="cat-section-header">
+      <h3>Income</h3>
+    </div>
+    <div id="incomeRows"></div>
+  </div>
+
+  <!-- Expense Breakdown -->
+  <div class="cat-section" id="expenseSection">
+    <div class="cat-section-header">
+      <h3>Expenses</h3>
+    </div>
+    <div id="expenseRows"></div>
+  </div>
+
+  <!-- Drill-down -->
+  <div class="drilldown" id="drilldown">
+    <div class="drilldown-header">
+      <h3 id="drilldownTitle">Transactions</h3>
+      <button class="drilldown-back" onclick="closeDrilldown()">&#8592; Back</button>
+    </div>
+    <div class="txn-list" id="txnList"></div>
+  </div>
+
+  <!-- Excluded Transfers -->
+  <div class="excluded-section">
+    <h3>Internal Transfers &amp; Excluded <span id="excludedBadge" style="font-weight:400;font-size:12px;color:var(--text-dim)"></span></h3>
+    <div id="excludedRows"></div>
+  </div>
+</div>
+
+<script>
+// ── Constants ──
+const PW_HASH = 'e3011a60c3cf5e71787c994f58494a8ce8bb9ed7479e11db1498054c2fec7219';
+const BASE_ID = 'appTXzlQGcpVk3IcU';
+const TABLE_ID = 'tbl9ahPA1hA2hZrv0';
+const MAIN_ACCT = '483101560383';
+
+// Account classifications
+const MEMBER_ACCOUNTS = ['FM PARAMUS MEMBER LLC', 'FM Paramus Member LLC', 'FM Plaza Member LLC', 'FM Kemble Membe', 'FM Kemble Member LLC'];
+const MGMT_ACCOUNT = 'First Mile Management LLC';
+const INVESTOR_ACCOUNTS = ['FM 340 Kemble LLC Investors'];
+
+// Biweekly payroll reimbursement amounts
+const PAYROLL_REIMB_AMOUNTS = [20200, 19939, 16287, 2011.36];
+const PAYROLL_REIMB_TOLERANCE = 0.50;
+
+// Income categories (user-defined)
+const INCOME_CATEGORIES = [
+  'Asset Management Fee Income',
+  'Property Management Fee Income',
+  'Investment Income',
+  'Other Income'
+];
+
+// Category icons
+const CAT_ICONS = {
+  'Asset Management Fee Income': '💰',
+  'Property Management Fee Income': '🏢',
+  'Investment Income': '📈',
+  'Other Income': '💵',
+  'Payroll': '👥',
+  'Credit Cards': '💳',
+  'Legal/Corp Services': '⚖️',
+  'Taxes': '🏛️',
+  'Wire Payments': '🔄',
+  'Banking': '🏦',
+  'Checks': '📝',
+  'AM Partner Payout': '🤝',
+  'PM Expenses': '🔧',
+  'Software/Services': '💻',
+  'Other Operating': '📋'
+};
+
+// All possible categories for the dropdown
+const ALL_CATEGORIES = [
+  ...INCOME_CATEGORIES,
+  'Payroll', 'Credit Cards', 'Legal/Corp Services', 'Taxes',
+  'Wire Payments', 'Banking', 'Checks', 'AM Partner Payout',
+  'PM Expenses', 'Software/Services', 'Other Operating',
+  'Internal Transfer', 'Payroll Reimbursement'
+];
+
+// State
+let allRecords = [];
+let categoryOverrides = {}; // recordId -> category
+let cfMode = 'monthly';
+let selectedPeriodIndex = -1; // -1 means latest
+let periods = [];
+
+// ── Password Check ──
+document.getElementById('pwInput').addEventListener('keydown', e => { if(e.key==='Enter') checkPassword(); });
+
+async function checkPassword() {
+  const pw = document.getElementById('pwInput').value;
+  const encoder = new TextEncoder();
+  const data = encoder.encode(pw);
+  const hashBuffer = await crypto.subtle.digest('SHA-256', data);
+  const hashArray = Array.from(new Uint8Array(hashBuffer));
+  const hashHex = hashArray.map(b => b.toString(16).padStart(2,'0')).join('');
+
+  if (hashHex === PW_HASH) {
+    sessionStorage.setItem('_exec_auth', '1');
+    document.getElementById('gateOverlay').classList.add('hidden');
+    initDashboard();
+  } else {
+    document.getElementById('gateError').classList.add('show');
+    document.getElementById('pwInput').value = '';
+    document.getElementById('pwInput').focus();
+  }
+}
+
+// ── Token Management ──
+// Injected at build time by GitHub Actions from repo secret AIRTABLE_TOKEN
+const AIRTABLE_TOKEN = '__AIRTABLE_TOKEN__';
+function getToken() { return AIRTABLE_TOKEN; }
+
+// ── Init ──
+function initDashboard() {
+  // Load category overrides from localStorage
+  try { categoryOverrides = JSON.parse(localStorage.getItem('_exec_cat_overrides') || '{}'); } catch(e) { categoryOverrides = {}; }
+
+  loadData();
+}
+
+if (sessionStorage.getItem('_exec_auth') === '1') {
+  document.getElementById('gateOverlay').classList.add('hidden');
+  initDashboard();
+}
+
+// ── Data Fetch ──
+async function fetchAllRecords(token) {
+  let records = [];
+  let offset = null;
+  const headers = { Authorization: `Bearer ${token}` };
+  do {
+    let url = `https://api.airtable.com/v0/${BASE_ID}/${TABLE_ID}?pageSize=100`;
+    if (offset) url += `&offset=${offset}`;
+    const resp = await fetch(url, { headers });
+    if (!resp.ok) throw new Error(`Airtable error: ${resp.status}`);
+    const data = await resp.json();
+    records = records.concat(data.records);
+    offset = data.offset || null;
+  } while (offset);
+  return records;
+}
+
+async function loadData() {
+  const bar = document.getElementById('loadBar');
+  bar.className = 'loading-bar active';
+  document.getElementById('mainHeader').style.display = 'flex';
+  document.getElementById('dashboard').classList.add('show');
+
+  try {
+    const token = getToken();
+    allRecords = await fetchAllRecords(token);
+    // Data loaded successfully
+    bar.className = 'loading-bar done';
+    buildPeriods();
+    selectedPeriodIndex = periods.length - 1;
+    renderAll();
+  } catch (e) {
+    bar.className = 'loading-bar';
+    console.error(e);
+    alert('Failed to load data: ' + e.message);
+  }
+}
+
+function refreshData() {
+  loadData();
+}
+
+// ── Helpers ──
+function getDate(record) {
+  const f = record.fields;
+  const dateVal = f.Date || f.fldgQFXI2kPiBQOdT;
+  return dateVal ? new Date(dateVal) : new Date(0);
+}
+
+function getField(record, name) {
+  const f = record.fields;
+  if (f[name] !== undefined) return f[name];
+  const map = {
+    'Description': 'fldlJucnQS8E5dFYG', 'Date': 'fldgQFXI2kPiBQOdT',
+    'Amount': 'fld4aW3FyVbUmgFVf', 'Ledger Balance': 'fldTMmHSCfpwHqP3J',
+    'Transaction Type': 'fldngEmDXwYGhijcY', 'Credit/Debit': 'fld4vsI6lQ4zgYA43',
+    'Account Name': 'fldNG9VQSGRB3tdBI', 'Account Number': 'fldQx16vpxLlf0X7O'
+  };
+  const fid = map[name];
+  return (fid && f[fid] !== undefined) ? f[fid] : null;
+}
+
+function getAccountName(r) { const v = getField(r, 'Account Name'); return !v ? '' : (typeof v === 'object' ? (v.name||'') : v); }
+function getDescription(r) { return getField(r, 'Description') || ''; }
+function getAmount(r) { return getField(r, 'Amount') || 0; }
+function getAccountNumber(r) { return getField(r, 'Account Number') || ''; }
+
+function fmt(n) {
+  const abs = Math.abs(n);
+  const s = abs.toLocaleString('en-US', { style:'currency', currency:'USD', minimumFractionDigits:0, maximumFractionDigits:0 });
+  return n < 0 ? `-${s}` : s;
+}
+
+function fmtFull(n) {
+  const abs = Math.abs(n);
+  const s = abs.toLocaleString('en-US', { style:'currency', currency:'USD' });
+  return n < 0 ? `-${s}` : s;
+}
+
+function showToast(msg) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  setTimeout(() => t.classList.remove('show'), 2000);
+}
+
+// ── Categorization ──
+function categorize(record) {
+  // Check for user override
+  if (categoryOverrides[record.id]) {
+    const oc = categoryOverrides[record.id];
+    const isIncome = INCOME_CATEGORIES.includes(oc);
+    const isExcluded = oc === 'Internal Transfer' || oc === 'Payroll Reimbursement';
+    if (isExcluded) return { category: oc === 'Payroll Reimbursement' ? 'payroll_offset' : 'excluded', type: oc };
+    return { category: isIncome ? 'income' : 'expense', type: oc };
+  }
+
+  const desc = getDescription(record).toUpperCase();
+  const amount = getAmount(record);
+  const acctName = getAccountName(record);
+  const acctNum = getAccountNumber(record);
+
+  if (desc.startsWith('DUPLICATE')) return { category: 'excluded', type: 'Duplicate' };
+
+  const isTransfer = desc.includes('ACCOUNT TRANSFER TRSF');
+
+  // AM Fees — credits in Member accounts
+  if (MEMBER_ACCOUNTS.some(m => acctName.toUpperCase().includes(m.toUpperCase())) && amount > 0 && !isTransfer) {
+    return { category: 'income', type: 'Asset Management Fee Income' };
+  }
+
+  // AM Partner payout from Member accounts
+  if (MEMBER_ACCOUNTS.some(m => acctName.toUpperCase().includes(m.toUpperCase())) && amount < 0 && !isTransfer) {
+    return { category: 'expense', type: 'AM Partner Payout' };
+  }
+
+  // PM Fees — credits in Management account
+  if ((acctName.toUpperCase().includes('MANAGEMENT') || acctName.toUpperCase().includes('FIRST MILE MANAGEMENT')) && amount > 0 && !isTransfer) {
+    return { category: 'income', type: 'Property Management Fee Income' };
+  }
+
+  // PM account expenses
+  if ((acctName.toUpperCase().includes('MANAGEMENT') || acctName.toUpperCase().includes('FIRST MILE MANAGEMENT')) && amount < 0 && !isTransfer) {
+    return { category: 'expense', type: 'PM Expenses' };
+  }
+
+  // Investment Income — Kemble Investors
+  if (INVESTOR_ACCOUNTS.some(a => acctName.toUpperCase().includes(a.toUpperCase())) && amount > 0 && !isTransfer) {
+    return { category: 'income', type: 'Investment Income' };
+  }
+
+  // Appfolio distributions (description contains APPFOLIO or SIGONFILE for property deposits)
+  if (desc.includes('APPFOLIO') && amount > 0) {
+    return { category: 'income', type: 'Investment Income' };
+  }
+
+  // Main operating account logic
+  if (acctNum === MAIN_ACCT) {
+    if (desc.includes('JUSTWORK')) return { category: 'expense', type: 'Payroll' };
+
+    if (isTransfer && amount > 0) {
+      const isPayrollReimb = PAYROLL_REIMB_AMOUNTS.some(a => Math.abs(amount - a) < PAYROLL_REIMB_TOLERANCE);
+      if (isPayrollReimb) return { category: 'payroll_offset', type: 'Payroll Reimbursement' };
+      return { category: 'excluded', type: 'Internal Transfer' };
+    }
+
+    if (isTransfer && amount < 0) return { category: 'excluded', type: 'Internal Transfer' };
+
+    // Sigonfile deposits
+    if (desc.includes('SIGONFILE') && amount > 0) return { category: 'income', type: 'Investment Income' };
+
+    // Wire in
+    if (desc.includes('WIRE') && amount > 0) return { category: 'income', type: 'Other Income' };
+
+    // Billpay credits
+    if (desc.includes('BILLPAY') && amount > 0) return { category: 'income', type: 'Other Income' };
+
+    // JLL
+    if (desc.includes('JLL') && amount > 0) return { category: 'income', type: 'Other Income' };
+
+    // Other credits
+    if (amount > 0) return { category: 'income', type: 'Other Income' };
+
+    // Operating expenses
+    if (desc.includes('CHASE CREDIT') || desc.includes('CITI AUTOPAY')) return { category: 'expense', type: 'Credit Cards' };
+    if (desc.includes('CORPORATION SERV') || desc.includes('LEGAL')) return { category: 'expense', type: 'Legal/Corp Services' };
+    if (desc.includes('NYS DTF') || desc.includes('NJ WEB PMT') || desc.includes('TAX')) return { category: 'expense', type: 'Taxes' };
+    if (desc.includes('JPMORGAN') || (desc.includes('CHASE') && !desc.includes('CREDIT'))) return { category: 'expense', type: 'Banking' };
+    if (desc.includes('WIRE') && amount < 0) return { category: 'expense', type: 'Wire Payments' };
+    if (desc.includes('CHECK') || desc.includes('Check')) return { category: 'expense', type: 'Checks' };
+    if (desc.includes('APPFOLIO') && amount < 0) return { category: 'expense', type: 'Software/Services' };
+
+    return { category: 'expense', type: 'Other Operating' };
+  }
+
+  // Non-main accounts: internal transfers
+  if (isTransfer) return { category: 'excluded', type: 'Internal Transfer' };
+
+  // Other property accounts
+  if (amount > 0) return { category: 'income', type: 'Other Income' };
+  if (amount < 0) return { category: 'expense', type: 'Other Operating' };
+
+  return { category: 'excluded', type: 'Uncategorized' };
+}
+
+// ── Periods ──
+function buildPeriods() {
+  periods = [];
+  if (allRecords.length === 0) return;
+
+  const dates = allRecords.map(r => getDate(r)).filter(d => d.getFullYear() > 2000);
+  const minDate = new Date(Math.min(...dates));
+  const maxDate = new Date(Math.max(...dates));
+
+  if (cfMode === 'monthly') {
+    let d = new Date(minDate.getFullYear(), minDate.getMonth(), 1);
+    while (d <= maxDate) {
+      periods.push({
+        label: d.toLocaleDateString('en-US', { month:'long', year:'numeric' }),
+        shortLabel: d.toLocaleDateString('en-US', { month:'short' }),
+        year: d.getFullYear(),
+        start: new Date(d),
+        end: new Date(d.getFullYear(), d.getMonth() + 1, 0, 23, 59, 59)
+      });
+      d = new Date(d.getFullYear(), d.getMonth() + 1, 1);
+    }
+  } else if (cfMode === 'quarterly') {
+    let d = new Date(minDate.getFullYear(), Math.floor(minDate.getMonth() / 3) * 3, 1);
+    while (d <= maxDate) {
+      const q = Math.floor(d.getMonth() / 3) + 1;
+      periods.push({
+        label: `Q${q} ${d.getFullYear()}`,
+        shortLabel: `Q${q}`,
+        year: d.getFullYear(),
+        start: new Date(d),
+        end: new Date(d.getFullYear(), d.getMonth() + 3, 0, 23, 59, 59)
+      });
+      d = new Date(d.getFullYear(), d.getMonth() + 3, 1);
+    }
+  } else {
+    let y = minDate.getFullYear();
+    while (y <= maxDate.getFullYear()) {
+      periods.push({
+        label: `${y}`,
+        shortLabel: `${y}`,
+        year: y,
+        start: new Date(y, 0, 1),
+        end: new Date(y, 11, 31, 23, 59, 59)
+      });
+      y++;
+    }
+  }
+}
+
+function getRecordsForPeriod(p) {
+  return allRecords.filter(r => {
+    const d = getDate(r);
+    return d >= p.start && d <= p.end;
+  });
+}
+
+function setCfMode(mode) {
+  cfMode = mode;
+  document.querySelectorAll('.cf-toggle button').forEach(b => b.classList.remove('active'));
+  document.querySelector(`.cf-toggle button[onclick="setCfMode('${mode}')"]`).classList.add('active');
+  buildPeriods();
+  selectedPeriodIndex = periods.length - 1;
+  renderAll();
+}
+
+function prevPeriod() {
+  if (selectedPeriodIndex > 0) { selectedPeriodIndex--; renderAll(); }
+}
+
+function nextPeriod() {
+  if (selectedPeriodIndex < periods.length - 1) { selectedPeriodIndex++; renderAll(); }
+}
+
+// ── Compute period financials ──
+function computePeriod(records) {
+  let totalIncome = 0, totalExpense = 0, payrollReimb = 0;
+  const incomeBuckets = {};
+  const expenseBuckets = {};
+  const excludedBuckets = {};
+
+  INCOME_CATEGORIES.forEach(c => incomeBuckets[c] = { total: 0, count: 0, records: [] });
+
+  records.forEach(r => {
+    const { category, type } = categorize(r);
+    const amount = getAmount(r);
+
+    if (category === 'income') {
+      totalIncome += amount;
+      if (!incomeBuckets[type]) incomeBuckets[type] = { total: 0, count: 0, records: [] };
+      incomeBuckets[type].total += amount;
+      incomeBuckets[type].count++;
+      incomeBuckets[type].records.push(r);
+    } else if (category === 'expense') {
+      totalExpense += amount;
+      if (!expenseBuckets[type]) expenseBuckets[type] = { total: 0, count: 0, records: [] };
+      expenseBuckets[type].total += amount;
+      expenseBuckets[type].count++;
+      expenseBuckets[type].records.push(r);
+    } else if (category === 'payroll_offset') {
+      payrollReimb += amount;
+      if (!excludedBuckets[type]) excludedBuckets[type] = { total: 0, count: 0 };
+      excludedBuckets[type].total += amount;
+      excludedBuckets[type].count++;
+    } else if (category === 'excluded') {
+      if (!excludedBuckets[type]) excludedBuckets[type] = { total: 0, count: 0 };
+      excludedBuckets[type].total += amount;
+      excludedBuckets[type].count++;
+    }
+  });
+
+  // Net payroll: add reimbursement offset to Payroll expense
+  const netExpense = totalExpense + payrollReimb;
+  const netSavings = totalIncome + netExpense;
+  const savingsRate = totalIncome > 0 ? (netSavings / totalIncome * 100) : 0;
+
+  return { totalIncome, totalExpense: Math.abs(totalExpense), netExpense, payrollReimb, netSavings, savingsRate, incomeBuckets, expenseBuckets, excludedBuckets };
+}
+
+// ── Render All ──
+function renderAll() {
+  closeDrilldown();
+  renderChart();
+  renderPeriodDashboard();
+}
+
+// ── Render Cash Flow Chart ──
+function renderChart() {
+  const container = document.getElementById('cfChart');
+  if (periods.length === 0) { container.innerHTML = '<p style="color:var(--text-dim);text-align:center;padding:40px;">No data</p>'; return; }
+
+  // Compute net cash flow per period
+  const periodData = periods.map((p, i) => {
+    const recs = getRecordsForPeriod(p);
+    const comp = computePeriod(recs);
+    return { ...p, income: comp.totalIncome, expense: comp.totalExpense, net: comp.netSavings, idx: i };
+  });
+
+  // Cumulative line
+  let cumulative = 0;
+  periodData.forEach(p => { cumulative += p.net; p.cumulative = cumulative; });
+
+  const W = Math.max(periods.length * 70, 600);
+  const H = 220;
+  const padL = 60, padR = 20, padT = 30, padB = 40;
+  const chartW = W - padL - padR;
+  const chartH = H - padT - padB;
+
+  // Y scale
+  const allVals = periodData.flatMap(p => [p.income, -p.expense, p.net, p.cumulative]);
+  const maxY = Math.max(...allVals, 0) * 1.15;
+  const minY = Math.min(...allVals, 0) * 1.15;
+  const rangeY = maxY - minY || 1;
+
+  const y = v => padT + chartH - ((v - minY) / rangeY * chartH);
+  const barW = Math.min(chartW / periods.length * 0.55, 40);
+  const gap = chartW / periods.length;
+
+  let svg = `<svg width="${W}" height="${H}" viewBox="0 0 ${W} ${H}" style="min-width:${W}px;">`;
+
+  // Zero line
+  const zeroY = y(0);
+  svg += `<line x1="${padL}" y1="${zeroY}" x2="${W-padR}" y2="${zeroY}" stroke="#ccc" stroke-width="1"/>`;
+
+  // Y axis labels
+  const steps = 5;
+  for (let i = 0; i <= steps; i++) {
+    const val = minY + (rangeY / steps) * i;
+    const yp = y(val);
+    const label = Math.abs(val) >= 1000 ? `${val < 0 ? '-' : ''}$${Math.round(Math.abs(val)/1000)}K` : `$${Math.round(val)}`;
+    svg += `<text x="${padL-8}" y="${yp+4}" font-size="10" fill="#999" text-anchor="end" font-family="sans-serif">${label}</text>`;
+    if (i > 0 && i < steps) svg += `<line x1="${padL}" y1="${yp}" x2="${W-padR}" y2="${yp}" stroke="#f0f0f0" stroke-width="1"/>`;
+  }
+
+  // Year separators
+  let lastYear = null;
+  periodData.forEach((p, i) => {
+    if (p.year !== lastYear) {
+      const x = padL + i * gap;
+      if (lastYear !== null) svg += `<line x1="${x}" y1="${padT}" x2="${x}" y2="${H-padB}" stroke="#ddd" stroke-width="1" stroke-dasharray="4,3"/>`;
+      // Year label
+      const nextYearIdx = periodData.findIndex((pp, j) => j > i && pp.year !== p.year);
+      const endIdx = nextYearIdx === -1 ? periodData.length : nextYearIdx;
+      const midX = padL + ((i + endIdx) / 2) * gap;
+      svg += `<text x="${midX}" y="${padT-8}" font-size="11" fill="#999" text-anchor="middle" font-family="sans-serif" font-weight="600">${p.year}</text>`;
+      lastYear = p.year;
+    }
+  });
+
+  // Bars — income (green, above zero) and expense (red, below zero)
+  periodData.forEach((p, i) => {
+    const cx = padL + i * gap + gap / 2;
+    const selected = i === selectedPeriodIndex;
+    const opacity = selected ? 1 : 0.7;
+
+    // Income bar (green, going up)
+    if (p.income > 0) {
+      const barH = (p.income / rangeY) * chartH;
+      svg += `<rect x="${cx - barW/2}" y="${zeroY - barH}" width="${barW/2 - 1}" height="${barH}" fill="var(--green)" rx="2" opacity="${opacity}" style="cursor:pointer" onclick="selectPeriod(${i})"/>`;
+    }
+    // Expense bar (red, going down)
+    if (p.expense > 0) {
+      const barH = (p.expense / rangeY) * chartH;
+      svg += `<rect x="${cx}" y="${zeroY}" width="${barW/2 - 1}" height="${barH}" fill="var(--red)" rx="2" opacity="${opacity}" style="cursor:pointer" onclick="selectPeriod(${i})"/>`;
+    }
+
+    // Selection indicator
+    if (selected) {
+      svg += `<rect x="${cx - gap/2 + 4}" y="${padT}" width="${gap - 8}" height="${chartH}" fill="rgba(0,0,0,0.04)" rx="4"/>`;
+    }
+  });
+
+  // Cumulative line
+  let linePath = '';
+  periodData.forEach((p, i) => {
+    const cx = padL + i * gap + gap / 2;
+    const cy = y(p.cumulative);
+    linePath += (i === 0 ? 'M' : 'L') + `${cx},${cy}`;
+  });
+  svg += `<path d="${linePath}" fill="none" stroke="#1a1a1a" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>`;
+
+  // Dots on cumulative line
+  periodData.forEach((p, i) => {
+    const cx = padL + i * gap + gap / 2;
+    const cy = y(p.cumulative);
+    svg += `<circle cx="${cx}" cy="${cy}" r="3" fill="#1a1a1a" style="cursor:pointer" onclick="selectPeriod(${i})"/>`;
+  });
+
+  // X axis labels
+  periodData.forEach((p, i) => {
+    const cx = padL + i * gap + gap / 2;
+    svg += `<text x="${cx}" y="${H - padB + 16}" font-size="10" fill="#999" text-anchor="middle" font-family="sans-serif">${p.shortLabel}</text>`;
+  });
+
+  svg += '</svg>';
+  container.innerHTML = svg;
+}
+
+function selectPeriod(idx) {
+  selectedPeriodIndex = idx;
+  renderAll();
+}
+
+// ── Render Period Dashboard ──
+function renderPeriodDashboard() {
+  if (periods.length === 0) return;
+  const period = periods[selectedPeriodIndex];
+  const records = getRecordsForPeriod(period);
+  const comp = computePeriod(records);
+
+  // Period title
+  document.getElementById('periodTitle').textContent = period.label;
+
+  // Summary cards
+  document.getElementById('totalIncome').textContent = fmt(comp.totalIncome);
+  document.getElementById('totalExpenses').textContent = fmt(comp.totalExpense);
+
+  const nsEl = document.getElementById('netSavings');
+  nsEl.textContent = fmt(comp.netSavings);
+  nsEl.className = 'value ' + (comp.netSavings >= 0 ? 'green' : 'red');
+
+  document.getElementById('savingsRate').textContent = `${Math.round(comp.savingsRate)}%`;
+
+  // Income rows
+  renderCategoryRows('incomeRows', comp.incomeBuckets, 'income', comp.totalIncome);
+
+  // Expense rows — add payroll reimbursement into Payroll display
+  const expDisplay = { ...comp.expenseBuckets };
+  if (expDisplay['Payroll'] && comp.payrollReimb > 0) {
+    expDisplay['Payroll'] = {
+      ...expDisplay['Payroll'],
+      total: expDisplay['Payroll'].total + comp.payrollReimb,
+      subNote: `Gross: ${fmtFull(expDisplay['Payroll'].total)} + Reimb: +${fmtFull(comp.payrollReimb)}`
+    };
+  }
+  renderCategoryRows('expenseRows', expDisplay, 'expense', comp.totalExpense);
+
+  // Excluded
+  const exDiv = document.getElementById('excludedRows');
+  const excludedEntries = Object.entries(comp.excludedBuckets).sort((a,b) => b[1].count - a[1].count);
+  const excludedCount = excludedEntries.reduce((s, [,v]) => s + v.count, 0);
+  document.getElementById('excludedBadge').textContent = `(${excludedCount} transactions)`;
+  exDiv.innerHTML = excludedEntries.map(([type, data]) =>
+    `<div class="excluded-row"><span>${type} (${data.count})</span><span>${fmtFull(data.total)}</span></div>`
+  ).join('');
+}
+
+function renderCategoryRows(containerId, buckets, cssClass, total) {
+  const container = document.getElementById(containerId);
+  const entries = Object.entries(buckets)
+    .filter(([, v]) => v.total !== 0)
+    .sort((a, b) => Math.abs(b[1].total) - Math.abs(a[1].total));
+
+  const maxVal = entries.length > 0 ? Math.max(...entries.map(([,v]) => Math.abs(v.total))) : 1;
+
+  container.innerHTML = entries.map(([type, data]) => {
+    const pct = total > 0 ? (Math.abs(data.total) / total * 100) : 0;
+    const barWidth = Math.max((Math.abs(data.total) / maxVal) * 100, 3);
+    const icon = CAT_ICONS[type] || (cssClass === 'income' ? '💵' : '📋');
+    return `
+      <div class="cat-row ${cssClass}" onclick="openDrilldown('${type}', '${cssClass}')">
+        <div class="cat-icon">${icon}</div>
+        <div class="cat-info">
+          <div class="cat-name">${type}</div>
+        </div>
+        <div class="cat-bar-wrap">
+          <div class="cat-bar" style="width:${barWidth}%">
+            <span class="cat-bar-label">${type}</span>
+          </div>
+        </div>
+        <div class="cat-amount">${fmtFull(Math.abs(data.total))} (${pct.toFixed(1)}%)</div>
+      </div>`;
+  }).join('');
+}
+
+// ── Drill-down ──
+function openDrilldown(type, cssClass) {
+  const period = periods[selectedPeriodIndex];
+  const records = getRecordsForPeriod(period);
+
+  // Find records matching this category
+  const matching = records.filter(r => {
+    const { type: t } = categorize(r);
+    return t === type;
+  });
+
+  // Sort by date descending
+  matching.sort((a, b) => getDate(b) - getDate(a));
+
+  document.getElementById('drilldownTitle').textContent = `${type} — ${period.label}`;
+
+  // Group by date
+  const groups = {};
+  matching.forEach(r => {
+    const d = getDate(r);
+    const key = d.toLocaleDateString('en-US', { month:'long', day:'numeric', year:'numeric' });
+    if (!groups[key]) groups[key] = [];
+    groups[key].push(r);
+  });
+
+  let html = '';
+  Object.entries(groups).forEach(([dateStr, recs]) => {
+    const dayTotal = recs.reduce((s, r) => s + getAmount(r), 0);
+    html += `<div class="txn-date-group">${dateStr}<span style="float:right">${dayTotal >= 0 ? '+' : ''}${fmtFull(dayTotal)}</span></div>`;
+    recs.forEach(r => {
+      const amount = getAmount(r);
+      const { type: currentType } = categorize(r);
+      const amtClass = amount >= 0 ? 'green' : 'red';
+      const amtStr = (amount >= 0 ? '+' : '') + fmtFull(amount);
+
+      // Build category select options
+      const options = ALL_CATEGORIES.map(c =>
+        `<option value="${c}" ${c === currentType ? 'selected' : ''}>${c}</option>`
+      ).join('');
+
+      html += `
+        <div class="txn-row">
+          <div class="txn-desc" title="${getDescription(r)}">${getDescription(r)}</div>
+          <div class="txn-acct">${getAccountName(r)}</div>
+          <select class="txn-cat-select" onchange="changeCategory('${r.id}', this.value)">
+            ${options}
+          </select>
+          <div class="txn-amount ${amtClass}">${amtStr}</div>
+        </div>`;
+    });
+  });
+
+  if (matching.length === 0) {
+    html = '<p style="color:var(--text-dim);padding:20px;text-align:center;">No transactions in this category for this period.</p>';
+  }
+
+  document.getElementById('txnList').innerHTML = html;
+
+  // Show drilldown, hide category sections
+  document.getElementById('drilldown').classList.add('show');
+  document.getElementById('incomeSection').style.display = 'none';
+  document.getElementById('expenseSection').style.display = 'none';
+}
+
+function closeDrilldown() {
+  document.getElementById('drilldown').classList.remove('show');
+  document.getElementById('incomeSection').style.display = '';
+  document.getElementById('expenseSection').style.display = '';
+}
+
+function changeCategory(recordId, newCategory) {
+  categoryOverrides[recordId] = newCategory;
+  localStorage.setItem('_exec_cat_overrides', JSON.stringify(categoryOverrides));
+  showToast(`Category → ${newCategory}`);
+  // Re-render the period dashboard (keeps drilldown open with refreshed data)
+  renderPeriodDashboard();
+}
+</script>
+</body>
+</html>
