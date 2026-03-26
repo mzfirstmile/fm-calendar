@@ -3426,6 +3426,42 @@ Budget data is available via get_budget_summary for: 61 S Paramus (281,504 SF), 
 
     html += '</tbody></table></div>';
 
+    // Reserve Draws section (only for capital tab)
+    if (sectionKey === 'capital') {
+      const propId = p.id || (bgtData[fbSelectedIdx] && bgtData[fbSelectedIdx].id);
+      const yr = fbSelectedYear;
+      const propDraws = (fbReserveDraws[propId] || []).filter(d => d.year === yr);
+
+      html += '<div style="margin-top:16px;border:1px solid var(--border);border-radius:10px;background:var(--surface);overflow:hidden">';
+      html += '<div style="padding:12px 16px;background:var(--surface2);font-weight:700;font-size:12px;display:flex;justify-content:space-between;align-items:center;border-bottom:1px solid var(--border)">';
+      html += '<span>Reserve Draws (Credits to Distributable Cash)</span>';
+      html += `<button onclick="fbShowAddDraw()" style="padding:4px 12px;background:var(--accent);color:#fff;border:none;border-radius:6px;font-size:11px;font-weight:600;cursor:pointer">+ Add Draw</button>`;
+      html += '</div>';
+
+      if (propDraws.length) {
+        html += '<table style="width:100%;border-collapse:collapse;font-size:12px">';
+        html += '<thead><tr style="background:var(--surface2);font-size:10px;text-transform:uppercase;color:var(--text-dim)">';
+        html += '<th style="padding:6px 12px;text-align:left">Reserve Type</th><th style="padding:6px 12px;text-align:left">Month</th><th style="padding:6px 12px;text-align:right">Amount</th><th style="padding:6px 12px;text-align:left">Description</th><th style="padding:6px 12px;width:40px"></th></tr></thead><tbody>';
+        const typeLabels = { ti_reserve: 'TI & Leasing Reserve', base_bldg_reserve: 'Base Bldg / Repair Reserve', repair_reserve: 'Repair Reserve', misc_reserve: 'Misc Reserve' };
+        let drawTotal = 0;
+        propDraws.forEach(d => {
+          drawTotal += d.draw_amount;
+          html += `<tr style="border-bottom:1px solid var(--border)">`;
+          html += `<td style="padding:6px 12px">${typeLabels[d.reserve_type] || d.reserve_type}</td>`;
+          html += `<td style="padding:6px 12px">${months[d.month - 1]} ${d.year}</td>`;
+          html += `<td style="padding:6px 12px;text-align:right;color:var(--green);font-weight:600">${fbFmtFull(d.draw_amount)}</td>`;
+          html += `<td style="padding:6px 12px;color:var(--text-dim);font-size:11px">${d.description || ''}</td>`;
+          html += `<td style="padding:6px 12px"><button onclick="fbDeleteDraw(${d.id})" style="background:none;border:none;color:var(--text-dim);cursor:pointer;font-size:14px" title="Delete">&times;</button></td>`;
+          html += '</tr>';
+        });
+        html += `<tr style="border-top:2px solid var(--border);font-weight:700"><td style="padding:8px 12px">Total Draws</td><td></td><td style="padding:8px 12px;text-align:right;color:var(--green)">${fbFmtFull(drawTotal)}</td><td></td><td></td></tr>`;
+        html += '</tbody></table>';
+      } else {
+        html += '<div style="padding:20px;text-align:center;color:var(--text-dim);font-size:12px">No reserve draws recorded for ' + yr + '. Click "Add Draw" to record a draw from reserves.</div>';
+      }
+      html += '</div>';
+    }
+
     body.innerHTML = html;
 
     // Restore collapsed state
@@ -3438,6 +3474,97 @@ Budget data is available via get_budget_summary for: 61 S Paramus (281,504 SF), 
       }
       document.querySelectorAll(`[data-cat-group="${id}"]`).forEach(r => r.classList.add('fb-cat-row-hidden'));
     });
+  }
+
+  // ── Reserve Draw CRUD ──
+  function fbShowAddDraw() {
+    const propId = bgtData[fbSelectedIdx] && bgtData[fbSelectedIdx].id;
+    const yr = fbSelectedYear;
+    let modal = document.getElementById('drawModal');
+    if (modal) modal.remove();
+    modal = document.createElement('div');
+    modal.id = 'drawModal';
+    modal.className = 'crud-overlay show';
+    modal.innerHTML = `
+      <div class="crud-modal" style="max-width:400px">
+        <h3 style="margin-bottom:16px;font-size:16px">Add Reserve Draw</h3>
+        <label style="display:block;font-size:11px;font-weight:600;color:var(--text-dim);text-transform:uppercase;letter-spacing:.3px;margin-bottom:4px">Reserve Type</label>
+        <select id="drawType" style="width:100%;padding:8px;border:1px solid var(--border);border-radius:6px;margin-bottom:12px;font-size:13px">
+          <option value="ti_reserve">TI & Leasing Reserve</option>
+          <option value="base_bldg_reserve">Base Bldg / Repair Reserve</option>
+          <option value="repair_reserve">Repair Reserve</option>
+          <option value="misc_reserve">Misc Reserve</option>
+        </select>
+        <label style="display:block;font-size:11px;font-weight:600;color:var(--text-dim);text-transform:uppercase;letter-spacing:.3px;margin-bottom:4px">Month</label>
+        <select id="drawMonth" style="width:100%;padding:8px;border:1px solid var(--border);border-radius:6px;margin-bottom:12px;font-size:13px">
+          ${['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'].map((m,i) => '<option value="'+(i+1)+'">'+m+' '+yr+'</option>').join('')}
+        </select>
+        <label style="display:block;font-size:11px;font-weight:600;color:var(--text-dim);text-transform:uppercase;letter-spacing:.3px;margin-bottom:4px">Draw Amount ($)</label>
+        <input type="number" id="drawAmount" step="0.01" min="0" placeholder="0.00" style="width:100%;padding:8px;border:1px solid var(--border);border-radius:6px;margin-bottom:12px;font-size:13px">
+        <label style="display:block;font-size:11px;font-weight:600;color:var(--text-dim);text-transform:uppercase;letter-spacing:.3px;margin-bottom:4px">Description (optional)</label>
+        <input type="text" id="drawDesc" placeholder="e.g. Suite 200 TI draw" style="width:100%;padding:8px;border:1px solid var(--border);border-radius:6px;margin-bottom:16px;font-size:13px">
+        <div class="modal-actions" style="display:flex;gap:8px;justify-content:flex-end">
+          <button onclick="document.getElementById('drawModal').remove()" style="padding:8px 16px;border:1px solid var(--border);border-radius:6px;background:var(--surface);cursor:pointer;font-size:12px">Cancel</button>
+          <button onclick="fbSaveDraw()" style="padding:8px 16px;border:none;border-radius:6px;background:var(--accent);color:#fff;cursor:pointer;font-size:12px;font-weight:600">Save Draw</button>
+        </div>
+      </div>`;
+    document.body.appendChild(modal);
+  }
+
+  async function fbSaveDraw() {
+    const propId = bgtData[fbSelectedIdx] && bgtData[fbSelectedIdx].id;
+    const yr = fbSelectedYear;
+    const type = document.getElementById('drawType').value;
+    const month = parseInt(document.getElementById('drawMonth').value);
+    const amount = parseFloat(document.getElementById('drawAmount').value) || 0;
+    const desc = document.getElementById('drawDesc').value.trim();
+    if (!amount) return;
+
+    try {
+      const resp = await fetch(`${SUPABASE_URL}/rest/v1/reserve_draws`, {
+        method: 'POST',
+        headers: {
+          'apikey': SUPABASE_KEY,
+          'Authorization': `Bearer ${SUPABASE_KEY}`,
+          'Content-Type': 'application/json',
+          'Prefer': 'return=representation'
+        },
+        body: JSON.stringify({ property_id: propId, year: yr, month, reserve_type: type, draw_amount: amount, description: desc || null })
+      });
+      if (!resp.ok) throw new Error(await resp.text());
+      const [newDraw] = await resp.json();
+      // Update local cache
+      if (!fbReserveDraws[propId]) fbReserveDraws[propId] = [];
+      fbReserveDraws[propId].push(newDraw);
+      document.getElementById('drawModal').remove();
+      // Re-render
+      fbRenderDetail();
+    } catch(e) {
+      console.error('Save draw error:', e);
+      alert('Failed to save draw: ' + e.message);
+    }
+  }
+
+  async function fbDeleteDraw(id) {
+    if (!confirm('Delete this reserve draw?')) return;
+    try {
+      const resp = await fetch(`${SUPABASE_URL}/rest/v1/reserve_draws?id=eq.${id}`, {
+        method: 'DELETE',
+        headers: {
+          'apikey': SUPABASE_KEY,
+          'Authorization': `Bearer ${SUPABASE_KEY}`,
+        }
+      });
+      if (!resp.ok) throw new Error(await resp.text());
+      // Remove from local cache
+      for (const pid of Object.keys(fbReserveDraws)) {
+        fbReserveDraws[pid] = fbReserveDraws[pid].filter(d => d.id !== id);
+      }
+      fbRenderDetail();
+    } catch(e) {
+      console.error('Delete draw error:', e);
+      alert('Failed to delete draw: ' + e.message);
+    }
   }
 
   // Track collapsed categories across re-renders
