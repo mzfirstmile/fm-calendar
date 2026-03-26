@@ -569,6 +569,12 @@ function setSession() {
   localStorage.setItem('_exec_auth_ts', Date.now().toString());
 }
 
+// ── Token Management ──
+// Production: injected at build time by GitHub Actions (sed replaces placeholder)
+// Local dev: loaded from config.js (gitignored) which sets window.AIRTABLE_TOKEN
+const AIRTABLE_TOKEN_FALLBACK = '__AIRTABLE_TOKEN__';
+function getToken() { return window.AIRTABLE_TOKEN || AIRTABLE_TOKEN_FALLBACK; }
+
 // Auto-unlock if session still valid
 if (isSessionValid()) {
   document.getElementById('gateOverlay').classList.add('hidden');
@@ -605,12 +611,6 @@ async function checkPassword() {
     document.getElementById('pwInput').focus();
   }
 }
-
-// ── Token Management ──
-// Production: injected at build time by GitHub Actions (sed replaces placeholder)
-// Local dev: loaded from config.js (gitignored) which sets window.AIRTABLE_TOKEN
-const AIRTABLE_TOKEN_FALLBACK = '__AIRTABLE_TOKEN__';
-function getToken() { return window.AIRTABLE_TOKEN || AIRTABLE_TOKEN_FALLBACK; }
 
 // ── Init ──
 function initDashboard() {
