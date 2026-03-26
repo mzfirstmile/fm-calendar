@@ -1746,8 +1746,8 @@ Budget data is available via get_budget_summary for: 61 S Paramus (281,504 SF), 
   let bgtData = null, bgtLoaded = false;
   let fbSelectedIdx = -1, fbActiveTab = 'summary', fbMode = 'nominal';
   let fbSelectedYear = 2026;
-  // Year config: 2026 budget only for now
   const FB_YEARS = [
+    { year: 2025, status: 'historical', label: '2025 Actuals' },
     { year: 2026, status: 'active', label: '2026 Budget' },
   ];
 
@@ -1818,149 +1818,121 @@ Budget data is available via get_budget_summary for: 61 S Paramus (281,504 SF), 
     return 'Other';
   }
 
+  // Helper: build year data (summaryRows, detailRows, totals) from raw Supabase rows for one property+year
+  function fbBuildYearData(rows, gl, glLookup) {
+    const MONTHS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+    const byGl = {};
+    rows.forEach(r => {
+      if (!byGl[r.gl_code]) byGl[r.gl_code] = { name: r.account_name, months: {} };
+      byGl[r.gl_code].months[MONTHS[r.month - 1]] = r.amount;
+    });
+
+    const detailRows = [];
+    for (const [code, data] of Object.entries(byGl)) {
+      const glInfo = glLookup[code];
+      const glType = glInfo ? glInfo.type : 'Reg';
+      if (glType === 'Head') continue;
+      const section = fbGlSection(code);
+      const category = fbGlCategory(code, data.name);
+      const monthVals = {};
+      MONTHS.forEach(m => { monthVals[m] = data.months[m] || 0; });
+      detailRows.push({ name: data.name, section, category, gl: code, vendor: '', months: monthVals, _isTotal: glType === 'Tot' });
+    }
+
+    const summaryRows = [];
+    const allGlCodes = new Set(Object.keys(byGl));
+    gl.forEach(g => {
+      if (g.type === 'Head') {
+        const gCode = parseInt(g.code);
+        const hasChildren = [...allGlCodes].some(c => { const cc = parseInt(c); return cc > gCode && cc < gCode + 100; });
+        if (hasChildren) allGlCodes.add(g.code);
+      }
+    });
+    gl.forEach(g => {
+      if (!allGlCodes.has(g.code)) return;
+      const data = byGl[g.code];
+      if (g.type === 'Head') {
+        summaryRows.push({ label: g.name, isHeader: true, isTotal: false, budget26: 0 });
+      } else {
+        const annual = data ? MONTHS.reduce((s, m) => s + (data.months[m] || 0), 0) : 0;
+        summaryRows.push({ label: g.name, isHeader: false, isTotal: g.type === 'Tot', budget26: annual, months: data ? data.months : {} });
+      }
+    });
+
+    const totalIncomeRow = summaryRows.find(r => r.label === 'TOTAL INCOME');
+    const noiRow = summaryRows.find(r => r.label === 'NET OPERATING INCOME');
+    const totalExpRow = summaryRows.find(r => r.label === 'TOTAL OPERATING EXPENSES' || r.label === 'TOTAL BUILDING EXPENSES');
+    let totalIncome = totalIncomeRow ? totalIncomeRow.budget26 : 0;
+    let noi = noiRow ? noiRow.budget26 : 0;
+    let totalExpenses = totalExpRow ? Math.abs(totalExpRow.budget26) : 0;
+    if (!totalIncome) totalIncome = detailRows.filter(r => r.section === 'revenue').reduce((s, r) => s + MONTHS.reduce((ms, m) => ms + (r.months[m] || 0), 0), 0);
+    if (!totalExpenses) totalExpenses = Math.abs(detailRows.filter(r => r.section === 'opex').reduce((s, r) => s + MONTHS.reduce((ms, m) => ms + (r.months[m] || 0), 0), 0));
+    if (!noi) noi = totalIncome - totalExpenses;
+
+    return { summaryRows, detailRows: detailRows.filter(r => !r._isTotal), totalIncome, totalExpenses, noi };
+  }
+
   async function fbInit() {
     if (!bgtLoaded) {
       bgtLoaded = true;
       try {
-        // Load GL accounts
         const gl = await fbLoadGlAccounts();
-        // Supabase REST caps at 1000 rows per request — paginate to get all ~4200
-        let budgetRows = [];
-        let offset = 0;
-        const pageSize = 1000;
-        while (true) {
-          const page = await supaFetch('budget_line_items', `?year=eq.2026&order=property_id,gl_code,month&limit=${pageSize}&offset=${offset}`);
-          budgetRows = budgetRows.concat(page);
-          if (page.length < pageSize) break;
-          offset += pageSize;
-        }
-        console.log('Budget rows loaded:', budgetRows.length);
-
-        // Group by property
-        const byProp = {};
-        budgetRows.forEach(row => {
-          if (!byProp[row.property_id]) byProp[row.property_id] = [];
-          byProp[row.property_id].push(row);
-        });
-
-        // Build GL lookup for type (Head/Reg/Tot)
         const glLookup = {};
         gl.forEach(g => { glLookup[g.code] = g; });
 
-        // Transform into bgtData format
-        bgtData = [];
-        const MONTHS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+        // Fetch ALL budget rows (both 2025 and 2026) with pagination
+        let allRows = [];
+        let offset = 0;
+        const pageSize = 1000;
+        while (true) {
+          const page = await supaFetch('budget_line_items', `?order=property_id,year,gl_code,month&limit=${pageSize}&offset=${offset}`);
+          allRows = allRows.concat(page);
+          if (page.length < pageSize) break;
+          offset += pageSize;
+        }
+        console.log('Total rows loaded:', allRows.length);
 
-        for (const [propId, rows] of Object.entries(byProp)) {
+        // Group by property → year
+        const byPropYear = {};
+        allRows.forEach(row => {
+          const key = row.property_id;
+          if (!byPropYear[key]) byPropYear[key] = {};
+          if (!byPropYear[key][row.year]) byPropYear[key][row.year] = [];
+          byPropYear[key][row.year].push(row);
+        });
+
+        bgtData = [];
+        for (const [propId, yearMap] of Object.entries(byPropYear)) {
           const meta = FB_PROP_META[propId];
           if (!meta) continue;
 
-          // Group rows by gl_code
-          const byGl = {};
-          rows.forEach(r => {
-            if (!byGl[r.gl_code]) byGl[r.gl_code] = { name: r.account_name, months: {} };
-            byGl[r.gl_code].months[MONTHS[r.month - 1]] = r.amount;
-          });
-
-          // Build detail rows (non-header, non-total GL codes)
-          const detailRows = [];
-          for (const [code, data] of Object.entries(byGl)) {
-            const glInfo = glLookup[code];
-            const glType = glInfo ? glInfo.type : 'Reg';
-            // Include Reg entries as detail rows; Tot entries go to summary
-            if (glType === 'Head') continue; // skip pure headers
-            const section = fbGlSection(code);
-            const category = fbGlCategory(code, data.name);
-            const monthVals = {};
-            MONTHS.forEach(m => { monthVals[m] = data.months[m] || 0; });
-            detailRows.push({
-              name: data.name,
-              section: section,
-              category: category,
-              gl: code,
-              vendor: '',
-              months: monthVals,
-              _isTotal: glType === 'Tot'
-            });
+          // Build year-specific data
+          const years = {};
+          fbYearTotals[meta.name] = {};
+          for (const [yr, rows] of Object.entries(yearMap)) {
+            const yd = fbBuildYearData(rows, gl, glLookup);
+            years[yr] = yd;
+            fbYearTotals[meta.name][parseInt(yr)] = { rev: Math.abs(yd.totalIncome), exp: Math.abs(yd.totalExpenses), noi: yd.noi };
           }
 
-          // Build summary rows from GL hierarchy
-          const summaryRows = [];
-          const orderedGl = gl.filter(g => byGl[g.code]); // only GL codes that have data for this property
-
-          // Also include head entries that frame the data
-          const allGlCodes = new Set(Object.keys(byGl));
-          gl.forEach(g => {
-            if (g.type === 'Head') {
-              // Include header if any child codes in range exist
-              const gCode = parseInt(g.code);
-              const hasChildren = [...allGlCodes].some(c => {
-                const cc = parseInt(c);
-                return cc > gCode && cc < gCode + 100;
-              });
-              if (hasChildren) allGlCodes.add(g.code);
-            }
-          });
-
-          // Walk through GL accounts in order and build summary
-          gl.forEach(g => {
-            if (!allGlCodes.has(g.code)) return;
-            const data = byGl[g.code];
-            if (g.type === 'Head') {
-              summaryRows.push({ label: g.name, isHeader: true, isTotal: false, budget26: 0 });
-            } else {
-              const annual = data ? MONTHS.reduce((s, m) => s + (data.months[m] || 0), 0) : 0;
-              const isTotal = g.type === 'Tot';
-              summaryRows.push({
-                label: g.name,
-                isHeader: false,
-                isTotal: isTotal,
-                budget26: annual,
-                months: data ? data.months : {}
-              });
-            }
-          });
-
-          // Compute totals — use dedicated total rows if available, otherwise sum from detail rows
-          const totalIncomeRow = summaryRows.find(r => r.label === 'TOTAL INCOME');
-          const noiRow = summaryRows.find(r => r.label === 'NET OPERATING INCOME');
-          const totalExpRow = summaryRows.find(r => r.label === 'TOTAL OPERATING EXPENSES' || r.label === 'TOTAL BUILDING EXPENSES');
-          let totalIncome = totalIncomeRow ? totalIncomeRow.budget26 : 0;
-          let noi = noiRow ? noiRow.budget26 : 0;
-          let totalExpenses = totalExpRow ? Math.abs(totalExpRow.budget26) : 0;
-          // Fallback: compute from detail rows if total rows not found
-          if (!totalIncome) {
-            totalIncome = detailRows.filter(r => r.section === 'revenue').reduce((s, r) => s + MONTHS.reduce((ms, m) => ms + (r.months[m] || 0), 0), 0);
-          }
-          if (!totalExpenses) {
-            totalExpenses = Math.abs(detailRows.filter(r => r.section === 'opex').reduce((s, r) => s + MONTHS.reduce((ms, m) => ms + (r.months[m] || 0), 0), 0));
-          }
-          if (!noi) {
-            noi = totalIncome - totalExpenses;
-          }
-
+          // Use 2026 as primary display (for cards)
+          const primary = years[2026] || years[2025] || { totalIncome: 0, totalExpenses: 0, noi: 0, summaryRows: [], detailRows: [] };
           bgtData.push({
             name: meta.name,
             sqft: meta.sqft,
             budgetYear: 2026,
-            totalIncome: totalIncome,
-            totalExpenses: totalExpenses,
-            noi: noi,
-            summaryRows: summaryRows,
-            detailRows: detailRows.filter(r => !r._isTotal) // detail rows exclude totals
+            totalIncome: primary.totalIncome,
+            totalExpenses: primary.totalExpenses,
+            noi: primary.noi,
+            summaryRows: primary.summaryRows,
+            detailRows: primary.detailRows,
+            years: years
           });
-
-          fbYearTotals[meta.name] = {
-            2026: { rev: Math.abs(totalIncome), exp: Math.abs(totalExpenses), noi: noi },
-          };
         }
 
-        // Sort by property name for consistent ordering
         bgtData.sort((a, b) => a.name.localeCompare(b.name));
-
       } catch (e) { console.error('Budget load error:', e); return; }
     }
-    // If no property selected, show cards
     if (fbSelectedIdx < 0) fbRenderCards();
   }
 
@@ -2117,9 +2089,8 @@ Budget data is available via get_budget_summary for: 61 S Paramus (281,504 SF), 
     const photo = FB_PHOTOS[p.name] || '';
     const imgHtml = photo ? `<img class="fb-detail-header-img" src="${photo}" alt="">` : '';
     const status = fbGetYearStatus();
-    const yearLabel = status === 'active' ? `${fbSelectedYear} Budget`
-      : status === 'planning' ? `${fbSelectedYear} Budget Planning`
-      : `${fbSelectedYear} (Historical)`;
+    const yrCfg = FB_YEARS.find(y => y.year === fbSelectedYear);
+    const yearLabel = yrCfg ? yrCfg.label : `${fbSelectedYear}`;
 
     document.getElementById('fbDetailHeader').innerHTML = `
       <div class="fb-detail-header-left">
@@ -2256,10 +2227,25 @@ Budget data is available via get_budget_summary for: 61 S Paramus (281,504 SF), 
     fbRenderDetail();
   }
 
+  // Get property data for the currently selected year
+  function fbGetPropForYear(p) {
+    const yd = p.years && p.years[fbSelectedYear];
+    if (!yd) return p; // fallback to base data
+    return {
+      ...p,
+      summaryRows: yd.summaryRows,
+      detailRows: yd.detailRows,
+      totalIncome: yd.totalIncome,
+      totalExpenses: yd.totalExpenses,
+      noi: yd.noi
+    };
+  }
+
   function fbRenderDetail() {
     const body = document.getElementById('fbDetailBody');
-    const p = bgtData[fbSelectedIdx];
-    if (!p) return;
+    const base = bgtData[fbSelectedIdx];
+    if (!base) return;
+    const p = fbGetPropForYear(base);
 
     if (fbActiveTab === 'summary') {
       fbRenderSummary(body, p);
