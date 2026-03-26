@@ -431,7 +431,7 @@
     <button class="chat-close" onclick="toggleChat()">&times;</button>
   </div>
   <div class="chat-messages" id="chatMessages">
-    <div class="chat-msg assistant">Hi Morris — I can help categorize transactions, explain entries, or update Airtable. Try telling me things like "The $1.2M wire on Jan 15 is an investor contribution" or "Show me uncategorized transactions".</div>
+    <div class="chat-msg assistant">Hi Morris — I can help categorize transactions, explain entries, or look up data. Try telling me things like "The $1.2M wire on Jan 15 is an investor contribution" or "Show me uncategorized transactions".</div>
   </div>
   <div class="chat-input-row">
     <textarea class="chat-input" id="chatInput" rows="1" placeholder="Tell me about a transaction..." onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();sendChat();}"></textarea>
@@ -444,12 +444,32 @@
   <div class="modal" id="modalContent"></div>
 </div>
 
-<!-- Local dev: config.js sets window.AIRTABLE_TOKEN (gitignored, won't exist in prod) -->
+<!-- Local dev: config.js sets Supabase vars (gitignored, won't exist in prod) -->
 <script src="config.js" onerror=""></script>
 <script>
+// ── Supabase Config ──
+const SUPABASE_URL = window.SUPABASE_URL || '__SUPABASE_URL__';
+const SUPABASE_KEY = window.SUPABASE_KEY || '__SUPABASE_KEY__';
+
+async function supaFetch(table, query = '') {
+  const r = await fetch(`${SUPABASE_URL}/rest/v1/${table}${query}`, {
+    headers: { 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}`, 'Content-Type': 'application/json' }
+  });
+  if (!r.ok) throw new Error(`Supabase ${r.status}: ${await r.text()}`);
+  return r.json();
+}
+
+async function supaWrite(table, method, body, query = '') {
+  const r = await fetch(`${SUPABASE_URL}/rest/v1/${table}${query}`, {
+    method,
+    headers: { 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}`, 'Content-Type': 'application/json', 'Prefer': 'return=representation' },
+    body: JSON.stringify(body)
+  });
+  if (!r.ok) throw new Error(`Supabase ${r.status}: ${await r.text()}`);
+  return method === 'DELETE' ? null : r.json();
+}
+
 // ── Constants ──
-const BASE_ID = 'appTXzlQGcpVk3IcU';
-const TABLE_ID = 'tbl9ahPA1hA2hZrv0';
 const MAIN_ACCT = '483101560383';
 
 // ── Corporate accounts to INCLUDE (everything else is excluded) ──
@@ -530,11 +550,7 @@ let cfMode = 'monthly';
 let selectedPeriodIndex = -1; // -1 means latest
 let periods = [];
 
-// ── Token Management ──
-// Production: injected at build time by GitHub Actions (sed replaces placeholder)
-// Local dev: loaded from config.js (gitignored) which sets window.AIRTABLE_TOKEN
-const AIRTABLE_TOKEN_FALLBACK = '__AIRTABLE_TOKEN__';
-function getToken() { return window.AIRTABLE_TOKEN || AIRTABLE_TOKEN_FALLBACK; }
+// Auth handled by parent site's Microsoft SSO; Supabase uses anon key
 
 // Auto-init (auth handled by parent site's Microsoft SSO)
 initDashboard();
@@ -555,43 +571,35 @@ let resizeTimer;
 window.addEventListener('resize', () => { clearTimeout(resizeTimer); resizeTimer = setTimeout(() => { if (allRecords.length) renderChart(); }, 200); });
 
 // ── Data Fetch ──
-async function fetchAllRecords(token) {
-  let records = [];
-  let offset = null;
-  const headers = { Authorization: `Bearer ${token}` };
-  do {
-    let url = `https://api.airtable.com/v0/${BASE_ID}/${TABLE_ID}?pageSize=100`;
-    if (offset) url += `&offset=${offset}`;
-    const resp = await fetch(url, { headers });
-    if (!resp.ok) throw new Error(`Airtable error: ${resp.status}`);
-    const data = await resp.json();
-    records = records.concat(data.records);
-    offset = data.offset || null;
-  } while (offset);
-  return records;
-}
-
 async function loadData() {
   const bar = document.getElementById('loadBar');
   bar.className = 'loading-bar active';
   document.getElementById('dashboard').classList.add('show');
 
   try {
-    const token = getToken();
-    const raw = await fetchAllRecords(token);
-    // Filter to corporate-level accounts only
-    // Filter to corporate-level accounts only (by number or name)
+    // Fetch transactions from Supabase, filter to 2026+ corporate accounts
     const includeNums = new Set(Object.keys(INCLUDE_ACCOUNTS));
     const includeNames = new Set(Object.values(INCLUDE_ACCOUNTS).map(n => n.toUpperCase()));
+    const raw = await supaFetch('exec_transactions', '?date=gte.2026-01-01&order=date.asc');
+    // Map to legacy record format for compatibility
     allRecords = raw.filter(r => {
-      const acctNum = String(getAccountNumber(r)).trim();
-      const acctName = getAccountName(r).toUpperCase().trim();
-      if (!includeNums.has(acctNum) && !includeNames.has(acctName)) return false;
-      // Only include 2026+ data
-      const d = getDate(r);
-      return d.getFullYear() >= 2026;
-    });
-    console.log(`Loaded ${raw.length} records, filtered to ${allRecords.length} corporate accounts`);
+      const acctNum = String(r.account_number || '').trim();
+      const acctName = (r.account_name || '').toUpperCase().trim();
+      return includeNums.has(acctNum) || includeNames.has(acctName);
+    }).map(r => ({
+      id: r.id,
+      fields: {
+        Date: r.date,
+        Description: r.description,
+        Amount: r.amount,
+        'Ledger Balance': r.ledger_balance,
+        'Transaction Type': r.transaction_type,
+        'Credit/Debit': r.credit_debit,
+        'Account Name': r.account_name,
+        'Account Number': r.account_number
+      }
+    }));
+    console.log(`Loaded ${raw.length} rows, filtered to ${allRecords.length} corporate accounts`);
     bar.className = 'loading-bar done';
     buildPeriods();
     selectedPeriodIndex = periods.length - 1;
@@ -1396,35 +1404,6 @@ When the user asks questions, just answer naturally. Be concise.`;
 }
 
 // ── Balance Sheet ──
-const INVESTMENTS_TABLE = 'tblzZn4NMXUYRZBqt';
-const LIABILITIES_TABLE = 'tblh9ZKlCwyreJ8tM';
-
-// Field IDs for Investments table
-const INV_FIELDS = {
-  name: 'fldX5ys676ayoxNYc',
-  membershipClass: 'fldq3aDBIuBTwmFrr',
-  ownership: 'fldU6w5LV9vnwBStm',
-  committed: 'fldQwyDR70uO6gJUR',
-  contributed: 'fldJSQQcIZAoNqSk6',
-  distributed: 'fldtO65Vvx5qG001G',
-  unreturned: 'fldVsxc6dj0X7Z7OS',
-  netEquity: 'fldviDb8s6v42qhza',
-  valuation: 'fld0EfM7mI7qdfNIf',
-  status: 'fld5SZIIZQ8Rwf2Ha'
-};
-
-// Field IDs for Liabilities table
-const LIAB_FIELDS = {
-  lender: 'fldvvtM6ou0ZADJie',
-  relatedDeal: 'fldCi9osyG9TUL600',
-  principal: 'fldM2nEv5uDF5KgCU',
-  currency: 'fldPeNMUOK590jdU6',
-  usdEquiv: 'fldxjjIHSsPbzToQZ',
-  maturity: 'fld6ZRgiKHCf7dzGx',
-  status: 'fld98KXnfxZiK2mg3',
-  notes: 'fldckrJ6NdV2mgllf'
-};
-
 let bsInvestments = [];
 let bsLiabilities = [];
 let jpyToUsd = null; // live rate
@@ -1448,56 +1427,42 @@ async function fetchJpyRate() {
   } catch(e) { console.warn('Fallback JPY API also failed'); }
 }
 
-async function fetchTable(tableId) {
-  const token = getToken();
-  let records = [], offset = null;
-  do {
-    let url = `https://api.airtable.com/v0/${BASE_ID}/${tableId}?pageSize=100`;
-    if (offset) url += `&offset=${offset}`;
-    const resp = await fetch(url, { headers: { Authorization: `Bearer ${token}` } });
-    if (!resp.ok) throw new Error(`Airtable ${resp.status}`);
-    const data = await resp.json();
-    records = records.concat(data.records);
-    offset = data.offset || null;
-  } while (offset);
-  return records;
-}
-
-function getInvField(r, key) {
-  const f = r.fields;
-  const fid = INV_FIELDS[key];
-  return f[key] !== undefined ? f[key] : (fid && f[fid] !== undefined ? f[fid] : null);
-}
-
-function getLiabField(r, key) {
-  const f = r.fields;
-  const fid = LIAB_FIELDS[key];
-  // Try common field names first
-  const nameMap = { lender: ['Lender / Description', 'Lender/Description'], relatedDeal: ['Related Deal'], principal: ['Principal Amount'],
-    currency: ['Currency'], usdEquiv: ['USD Equivalent'], maturity: ['Maturity Date'], status: ['Status'], notes: ['Notes'] };
-  const names = nameMap[key] || [];
-  for (const n of names) { if (f[n] !== undefined) return f[n]; }
-  return (fid && f[fid] !== undefined) ? f[fid] : null;
-}
+// Supabase field accessors (direct column names)
+function getInvField(r, key) { return r[key] !== undefined ? r[key] : null; }
+function getLiabField(r, key) { return r[key] !== undefined ? r[key] : null; }
 
 async function loadBalanceSheet() {
   try {
     const [inv, liab] = await Promise.all([
-      fetchTable(INVESTMENTS_TABLE),
-      fetchTable(LIABILITIES_TABLE),
+      supaFetch('exec_investments', '?order=name.asc'),
+      supaFetch('exec_liabilities', '?order=maturity_date.asc.nullslast'),
       fetchJpyRate()
     ]);
-    bsInvestments = inv;
-    bsLiabilities = liab;
-    // Sort liabilities by maturity date ascending (oldest first)
-    bsLiabilities.sort((a, b) => {
-      const mA = getLiabField(a, 'maturity');
-      const mB = getLiabField(b, 'maturity');
-      if (!mA && !mB) return 0;
-      if (!mA) return 1;
-      if (!mB) return -1;
-      return new Date(mA) - new Date(mB);
-    });
+    // Map to compatible format with .id at top level
+    bsInvestments = inv.map(r => ({
+      id: r.id,
+      name: r.name,
+      ownership: r.ownership_pct,
+      committed: r.committed,
+      contributed: r.contributed,
+      distributed: r.distributed,
+      unreturned: r.unreturned_capital,
+      netEquity: r.net_equity,
+      valuation: r.valuation,
+      status: r.status || '',
+      membershipClass: r.membership_class || ''
+    }));
+    bsLiabilities = liab.map(r => ({
+      id: r.id,
+      lender: r.lender,
+      relatedDeal: r.related_deal,
+      principal: r.principal,
+      currency: r.currency || 'USD',
+      usdEquiv: r.usd_equivalent,
+      maturity: r.maturity_date,
+      status: r.status || '',
+      notes: r.notes || ''
+    }));
     renderBalanceSheet();
   } catch (e) {
     console.error('Balance sheet load error:', e);
@@ -1527,47 +1492,25 @@ function renderBalanceSheet() {
   // Investments total (use valuation if available, else unreturned capital)
   let investmentsTotal = 0;
   const invCards = bsInvestments.map(r => {
-    const f = r.fields;
-    const name = f[INV_FIELDS.name] || f['Investment'] || 'Unknown';
-    const ownership = f[INV_FIELDS.ownership] || f['Ownership %'] || 0;
-    const committed = f[INV_FIELDS.committed] || f['Committed'] || 0;
-    const contributed = f[INV_FIELDS.contributed] || f['Contributed'] || 0;
-    const distributed = f[INV_FIELDS.distributed] || f['Distributed'] || 0;
-    const unreturned = f[INV_FIELDS.unreturned] || f['Unreturned Capital'] || 0;
-    const valuation = f[INV_FIELDS.valuation] || f['Valuation'] || null;
-    const netEquity = f[INV_FIELDS.netEquity] || f['Net Equity'] || 0;
-    const status = f[INV_FIELDS.status] || f['Status'] || '';
-
-    const value = valuation || unreturned || contributed;
+    const value = r.valuation || r.unreturned || r.contributed;
     investmentsTotal += value;
-
-    return { id: r.id, name, ownership, committed, contributed, distributed, unreturned, valuation, netEquity, status, value };
+    return { id: r.id, name: r.name || 'Unknown', ownership: r.ownership || 0, committed: r.committed || 0, contributed: r.contributed || 0, distributed: r.distributed || 0, unreturned: r.unreturned || 0, valuation: r.valuation, netEquity: r.netEquity || 0, status: r.status, value };
   });
 
   // Liabilities total (USD equivalent)
   let liabilitiesTotal = 0;
   const liabCards = bsLiabilities.map(r => {
-    const lender = getLiabField(r, 'lender') || 'Unknown';
-    const deal = getLiabField(r, 'relatedDeal') || '';
-    const principal = getLiabField(r, 'principal') || 0;
-    const currency = getLiabField(r, 'currency') || 'USD';
-    const usdEquiv = getLiabField(r, 'usdEquiv') || null;
-    const maturity = getLiabField(r, 'maturity') || null;
-    const status = getLiabField(r, 'status') || '';
-    const notes = getLiabField(r, 'notes') || '';
-
-    // Use live JPY rate if available, else fall back to stored USD equivalent
+    const currency = r.currency || 'USD';
     let usdValue;
-    if (currency === 'USD' || (typeof currency === 'object' && currency.name === 'USD')) {
-      usdValue = principal;
-    } else if (jpyToUsd && (currency === 'JPY' || (typeof currency === 'object' && currency.name === 'JPY'))) {
-      usdValue = principal * jpyToUsd;
+    if (currency === 'USD') {
+      usdValue = r.principal || 0;
+    } else if (jpyToUsd && currency === 'JPY') {
+      usdValue = (r.principal || 0) * jpyToUsd;
     } else {
-      usdValue = usdEquiv || 0;
+      usdValue = r.usdEquiv || 0;
     }
     liabilitiesTotal += usdValue;
-
-    return { id: r.id, lender, deal, principal, currency, usdEquiv, maturity, status, notes, usdValue };
+    return { id: r.id, lender: r.lender || 'Unknown', deal: r.relatedDeal || '', principal: r.principal || 0, currency, usdEquiv: r.usdEquiv, maturity: r.maturity, status: r.status, notes: r.notes, usdValue };
   });
 
   const totalAssets = cash + investmentsTotal;
@@ -1711,14 +1654,8 @@ async function saveAssetValue(recordId) {
   const inp = document.getElementById(`avInput-${recordId}`);
   const val = parseFloat(inp.value.replace(/[^0-9.-]/g, ''));
   if (isNaN(val)) { showToast('Invalid number'); return; }
-  const token = getToken();
   try {
-    const resp = await fetch(`https://api.airtable.com/v0/${BASE_ID}/${INVESTMENTS_TABLE}/${recordId}`, {
-      method: 'PATCH',
-      headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
-      body: JSON.stringify({ fields: { [INV_FIELDS.valuation]: val } })
-    });
-    if (!resp.ok) throw new Error(`Airtable ${resp.status}`);
+    await supaWrite('exec_investments', 'PATCH', { valuation: val }, `?id=eq.${recordId}`);
     showToast('Asset value updated');
     await loadBalanceSheet();
   } catch(e) { showToast('Error: ' + e.message); }
@@ -1752,21 +1689,10 @@ async function saveNewInvestment() {
   const distributed = parseFloat(document.getElementById('invDistributed').value) || 0;
   const valuation = parseFloat(document.getElementById('invValuation').value) || null;
   if (!name) { showToast('Name required'); return; }
-  const token = getToken();
-  const fields = {
-    [INV_FIELDS.name]: name,
-    [INV_FIELDS.ownership]: ownership,
-    [INV_FIELDS.contributed]: contributed,
-    [INV_FIELDS.distributed]: distributed
-  };
-  if (valuation) fields[INV_FIELDS.valuation] = valuation;
+  const body = { name, ownership_pct: ownership, contributed, distributed };
+  if (valuation) body.valuation = valuation;
   try {
-    const resp = await fetch(`https://api.airtable.com/v0/${BASE_ID}/${INVESTMENTS_TABLE}`, {
-      method: 'POST',
-      headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
-      body: JSON.stringify({ fields })
-    });
-    if (!resp.ok) throw new Error(`Airtable ${resp.status}`);
+    await supaWrite('exec_investments', 'POST', body);
     closeModal();
     showToast('Investment added');
     await loadBalanceSheet();
@@ -1776,12 +1702,11 @@ async function saveNewInvestment() {
 function openEditInvestment(recordId) {
   const r = bsInvestments.find(rec => rec.id === recordId);
   if (!r) return;
-  const f = r.fields;
-  const name = f[INV_FIELDS.name] || f['Investment'] || '';
-  const ownership = f[INV_FIELDS.ownership] || f['Ownership %'] || 0;
-  const contributed = f[INV_FIELDS.contributed] || f['Contributed'] || 0;
-  const distributed = f[INV_FIELDS.distributed] || f['Distributed'] || 0;
-  const valuation = f[INV_FIELDS.valuation] || f['Valuation'] || '';
+  const name = r.name || '';
+  const ownership = r.ownership || 0;
+  const contributed = r.contributed || 0;
+  const distributed = r.distributed || 0;
+  const valuation = r.valuation || '';
   openModal(`
     <h3>Edit Investment</h3>
     <label>Investment Name</label>
@@ -1808,21 +1733,8 @@ async function saveEditInvestment(recordId) {
   const distributed = parseFloat(document.getElementById('invDistributed').value) || 0;
   const valuation = parseFloat(document.getElementById('invValuation').value) || null;
   if (!name) { showToast('Name required'); return; }
-  const token = getToken();
-  const fields = {
-    [INV_FIELDS.name]: name,
-    [INV_FIELDS.ownership]: ownership,
-    [INV_FIELDS.contributed]: contributed,
-    [INV_FIELDS.distributed]: distributed,
-    [INV_FIELDS.valuation]: valuation || 0
-  };
   try {
-    const resp = await fetch(`https://api.airtable.com/v0/${BASE_ID}/${INVESTMENTS_TABLE}/${recordId}`, {
-      method: 'PATCH',
-      headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
-      body: JSON.stringify({ fields })
-    });
-    if (!resp.ok) throw new Error(`Airtable ${resp.status}`);
+    await supaWrite('exec_investments', 'PATCH', { name, ownership_pct: ownership, contributed, distributed, valuation: valuation || 0 }, `?id=eq.${recordId}`);
     closeModal();
     showToast('Investment updated');
     await loadBalanceSheet();
@@ -1841,13 +1753,8 @@ async function deleteInvestment(recordId, name) {
 }
 
 async function confirmDeleteInvestment(recordId) {
-  const token = getToken();
   try {
-    const resp = await fetch(`https://api.airtable.com/v0/${BASE_ID}/${INVESTMENTS_TABLE}/${recordId}`, {
-      method: 'DELETE',
-      headers: { Authorization: `Bearer ${token}` }
-    });
-    if (!resp.ok) throw new Error(`Airtable ${resp.status}`);
+    await supaWrite('exec_investments', 'DELETE', null, `?id=eq.${recordId}`);
     closeModal();
     showToast('Investment deleted');
     await loadBalanceSheet();
@@ -1882,22 +1789,11 @@ async function saveNewLiability() {
   const maturity = document.getElementById('liabMaturity').value;
   const notes = document.getElementById('liabNotes').value.trim();
   if (!lender) { showToast('Lender required'); return; }
-  const token = getToken();
-  const fields = {
-    [LIAB_FIELDS.lender]: lender,
-    [LIAB_FIELDS.principal]: principal,
-    [LIAB_FIELDS.currency]: currency,
-    [LIAB_FIELDS.status]: 'Active'
-  };
-  if (maturity) fields[LIAB_FIELDS.maturity] = maturity;
-  if (notes) fields[LIAB_FIELDS.notes] = notes;
+  const body = { lender, principal, currency, status: 'Active' };
+  if (maturity) body.maturity_date = maturity;
+  if (notes) body.notes = notes;
   try {
-    const resp = await fetch(`https://api.airtable.com/v0/${BASE_ID}/${LIABILITIES_TABLE}`, {
-      method: 'POST',
-      headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
-      body: JSON.stringify({ fields })
-    });
-    if (!resp.ok) { const txt = await resp.text(); throw new Error(`Airtable ${resp.status}: ${txt}`); }
+    await supaWrite('exec_liabilities', 'POST', body);
     closeModal();
     showToast('Liability added');
     await loadBalanceSheet();
@@ -1907,12 +1803,11 @@ async function saveNewLiability() {
 function openEditLiability(recordId) {
   const r = bsLiabilities.find(rec => rec.id === recordId);
   if (!r) return;
-  const lender = getLiabField(r, 'lender') || '';
-  const principal = getLiabField(r, 'principal') || 0;
-  const currency = getLiabField(r, 'currency');
-  const currName = typeof currency === 'object' ? currency.name : (currency || 'USD');
-  const maturity = getLiabField(r, 'maturity') || '';
-  const notes = getLiabField(r, 'notes') || '';
+  const lender = r.lender || '';
+  const principal = r.principal || 0;
+  const currName = r.currency || 'USD';
+  const maturity = r.maturity || '';
+  const notes = r.notes || '';
   openModal(`
     <h3>Edit Liability</h3>
     <label>Lender / Description</label>
@@ -1939,21 +1834,10 @@ async function saveEditLiability(recordId) {
   const maturity = document.getElementById('liabMaturity').value;
   const notes = document.getElementById('liabNotes').value.trim();
   if (!lender) { showToast('Lender required'); return; }
-  const token = getToken();
-  const fields = {
-    [LIAB_FIELDS.lender]: lender,
-    [LIAB_FIELDS.principal]: principal,
-    [LIAB_FIELDS.currency]: currency
-  };
-  if (maturity) fields[LIAB_FIELDS.maturity] = maturity;
-  fields[LIAB_FIELDS.notes] = notes;
+  const body = { lender, principal, currency, notes };
+  if (maturity) body.maturity_date = maturity;
   try {
-    const resp = await fetch(`https://api.airtable.com/v0/${BASE_ID}/${LIABILITIES_TABLE}/${recordId}`, {
-      method: 'PATCH',
-      headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
-      body: JSON.stringify({ fields })
-    });
-    if (!resp.ok) throw new Error(`Airtable ${resp.status}`);
+    await supaWrite('exec_liabilities', 'PATCH', body, `?id=eq.${recordId}`);
     closeModal();
     showToast('Liability updated');
     await loadBalanceSheet();
@@ -1972,13 +1856,8 @@ async function deleteLiability(recordId, name) {
 }
 
 async function confirmDeleteLiability(recordId) {
-  const token = getToken();
   try {
-    const resp = await fetch(`https://api.airtable.com/v0/${BASE_ID}/${LIABILITIES_TABLE}/${recordId}`, {
-      method: 'DELETE',
-      headers: { Authorization: `Bearer ${token}` }
-    });
-    if (!resp.ok) throw new Error(`Airtable ${resp.status}`);
+    await supaWrite('exec_liabilities', 'DELETE', null, `?id=eq.${recordId}`);
     closeModal();
     showToast('Liability deleted');
     await loadBalanceSheet();
