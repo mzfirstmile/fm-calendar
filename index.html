@@ -117,18 +117,19 @@
   }
 
   .topbar {
-    padding: 20px 40px;
+    padding: 16px 40px;
     display: flex;
     align-items: center;
     justify-content: space-between;
     border-bottom: 1px solid var(--border);
     background: var(--surface);
+    gap: 16px;
   }
-  .topbar h1 {
-    font-size: 18px;
-    font-weight: 600;
-  }
-  .topbar h1 span { color: var(--accent); }
+  .topbar-left { display:flex; align-items:center; gap:16px; }
+  .topbar-logo img { height:28px; width:auto; }
+  .topbar-divider { width:1px; height:24px; background:var(--border); }
+  .topbar-module { font-size:14px; font-weight:600; color:var(--text-dim); }
+  .topbar-module span { color:var(--accent); }
   .topbar-right {
     display: flex;
     align-items: center;
@@ -373,21 +374,34 @@
   @keyframes spin { to { transform: rotate(360deg); } }
 
   /* ── Calendar ── */
-  .cal-controls { display:flex; align-items:center; justify-content:space-between; margin-bottom:20px; flex-wrap:wrap; gap:12px; }
+  .cal-controls { display:flex; align-items:center; justify-content:space-between; margin-bottom:16px; flex-wrap:wrap; gap:12px; }
+  .cal-left { display:flex; align-items:center; gap:16px; }
   .cal-nav { display:flex; align-items:center; gap:12px; }
-  .cal-nav button { width:32px; height:32px; border-radius:8px; border:1px solid var(--border); background:var(--surface); cursor:pointer; font-size:15px; color:var(--text-dim); transition:all .15s; display:flex; align-items:center; justify-content:center; }
+  .cal-nav button { width:32px; height:32px; border-radius:7px; border:1px solid var(--border); background:var(--surface); cursor:pointer; font-size:15px; color:var(--text-dim); transition:all .15s; display:flex; align-items:center; justify-content:center; }
   .cal-nav button:hover { background:var(--surface2); color:var(--text); }
-  .cal-nav .cal-month { font-size:17px; font-weight:600; min-width:160px; text-align:center; }
-  .cal-status { display:flex; align-items:center; gap:8px; }
+  .cal-nav .cal-month { font-size:17px; font-weight:600; min-width:170px; text-align:center; }
+  .cal-right { display:flex; align-items:center; gap:10px; }
+  .cal-status { display:flex; align-items:center; gap:6px; }
   .cal-status .sync-dot { width:7px; height:7px; border-radius:50%; }
   .cal-status .sync-dot.live { background:var(--green); }
   .cal-status .sync-dot.err { background:#e5534b; }
   .cal-status span { font-size:11px; color:var(--text-dim); }
-  .cal-progress { height:5px; background:var(--surface2); border-radius:3px; overflow:hidden; margin-bottom:16px; }
+  .cal-btn { padding:7px 14px; border-radius:7px; font-size:12px; font-weight:600; text-decoration:none; cursor:pointer; border:1px solid var(--border); background:var(--surface); color:var(--text-dim); transition:all .2s; display:inline-flex; align-items:center; gap:5px; }
+  .cal-btn:hover { background:var(--surface2); color:var(--text); }
+  .cal-btn.accent { color:var(--accent); border-color:rgba(0,176,212,.3); background:rgba(0,176,212,.06); }
+  .cal-btn.accent:hover { background:rgba(0,176,212,.15); }
+  .cal-progress-section { margin-bottom:16px; }
+  .cal-progress-header { display:flex; align-items:center; justify-content:space-between; margin-bottom:6px; }
+  .cal-progress-label { font-size:13px; font-weight:600; }
+  .cal-progress-label .done-count { color:var(--green); }
+  .cal-progress-label .total-count { color:var(--text-dim); }
+  .cal-progress { height:6px; background:var(--surface2); border-radius:3px; overflow:hidden; }
   .cal-progress-fill { height:100%; background:linear-gradient(90deg,var(--accent),var(--green)); border-radius:3px; transition:width .4s; }
+  .cal-all-done { margin-top:8px; padding:8px 14px; background:rgba(26,154,107,.06); border:1px solid rgba(26,154,107,.3); border-radius:7px; font-size:12px; color:var(--green); font-weight:600; text-align:center; display:none; }
+  .cal-all-done.show { display:block; }
   .cal-filters { display:flex; flex-wrap:wrap; gap:6px; margin-bottom:20px; }
-  .cal-chip { padding:4px 11px; border-radius:16px; font-size:11px; font-weight:500; cursor:pointer; border:1.5px solid var(--border); background:var(--surface); color:var(--text-dim); transition:all .15s; user-select:none; }
-  .cal-chip.on { color:#fff; }
+  .cal-chip { padding:5px 12px; border-radius:18px; font-size:11px; font-weight:500; cursor:pointer; border:1.5px solid var(--border); background:var(--surface); color:var(--text-dim); transition:all .2s; user-select:none; }
+  .cal-chip.on { color:#fff; font-weight:600; }
   .cal-grid { display:grid; grid-template-columns:repeat(7,1fr); gap:1px; background:var(--border); border-radius:10px; overflow:hidden; border:1px solid var(--border); }
   .cal-hdr { background:var(--surface); padding:8px; text-align:center; font-size:11px; font-weight:600; color:var(--text-dim); text-transform:uppercase; letter-spacing:.5px; }
   .cal-cell { background:var(--surface); min-height:110px; padding:6px; position:relative; transition:background .15s; }
@@ -467,7 +481,11 @@
 <!-- ── Main ── -->
 <div class="main">
   <div class="topbar">
-    <h1 id="topbar-title">First Mile <span>Admin</span></h1>
+    <div class="topbar-left">
+      <div class="topbar-logo"><img src="First_Mile_Capital_Logo_RGB.png" alt="First Mile Capital"></div>
+      <div class="topbar-divider"></div>
+      <div class="topbar-module" id="topbar-module"></div>
+    </div>
     <div class="topbar-right">
       <div class="user-pill">
         <div class="user-avatar">MZ</div>
@@ -590,18 +608,29 @@
   <!-- Calendar View (native) -->
   <div class="manage-view" id="view-calendar" style="padding:24px 32px; overflow-y:auto; max-height:calc(100vh - 65px);">
     <div class="cal-controls">
-      <div class="cal-nav">
-        <button onclick="calChangeMonth(-1)">‹</button>
-        <div class="cal-month" id="calMonthLabel"></div>
-        <button onclick="calChangeMonth(1)">›</button>
+      <div class="cal-left">
+        <div class="cal-nav">
+          <button onclick="calChangeMonth(-1)">‹</button>
+          <div class="cal-month" id="calMonthLabel"></div>
+          <button onclick="calChangeMonth(1)">›</button>
+        </div>
+        <div class="cal-status">
+          <div class="sync-dot" id="calSyncDot"></div>
+          <span id="calSyncText">Loading…</span>
+        </div>
       </div>
-      <div class="cal-status">
-        <div class="sync-dot" id="calSyncDot"></div>
-        <span id="calSyncText">Loading…</span>
-        <button class="btn" onclick="calRefresh()" style="margin-left:8px; padding:5px 12px; font-size:11px;">↻ Refresh</button>
+      <div class="cal-right">
+        <button class="cal-btn" onclick="calRefresh()">↻ Refresh</button>
+        <a class="cal-btn accent" href="https://airtable.com/app27jUbqonTIiHXY" target="_blank">✎ Manage Data</a>
       </div>
     </div>
-    <div class="cal-progress"><div class="cal-progress-fill" id="calProgress" style="width:0%"></div></div>
+    <div class="cal-progress-section">
+      <div class="cal-progress-header">
+        <div class="cal-progress-label"><span class="done-count" id="calDoneCount">0</span> / <span class="total-count" id="calTotalCount">0</span> tasks complete</div>
+      </div>
+      <div class="cal-progress"><div class="cal-progress-fill" id="calProgress" style="width:0%"></div></div>
+      <div class="cal-all-done" id="calAllDone">🎉 All tasks complete for this view!</div>
+    </div>
     <div class="cal-filters" id="calFilters"></div>
     <div class="cal-grid" id="calGrid"></div>
     <div class="cal-tooltip" id="calTooltip"></div>
@@ -625,7 +654,7 @@
 <script>
   // ── View Switching ──
   const VIEW_TITLES = {
-    home: 'First Mile <span>Admin</span>',
+    home: '',
     calendar: 'Accounting <span>Calendar</span>',
     financials: 'Property <span>Financials</span>',
     budgeting: 'Property <span>Budgeting</span>',
@@ -640,8 +669,13 @@
     const sidebarItem = document.querySelector(`.sidebar-item[data-view="${view}"]`);
     if (sidebarItem) sidebarItem.classList.add('active');
 
-    // Update topbar title
-    document.getElementById('topbar-title').innerHTML = VIEW_TITLES[view] || VIEW_TITLES.home;
+    // Update topbar module name
+    const moduleEl = document.getElementById('topbar-module');
+    const divider = document.querySelector('.topbar-divider');
+    const title = VIEW_TITLES[view] || '';
+    moduleEl.innerHTML = title;
+    moduleEl.style.display = title ? '' : 'none';
+    divider.style.display = title ? '' : 'none';
 
     // Hide all views
     document.getElementById('view-home').style.display = 'none';
@@ -829,10 +863,14 @@
     document.getElementById('calMonthLabel').textContent = `${CAL_MONTHS[m]} ${year}`;
 
     // Progress
-    const done = visible.filter(e => e.status === 'Done').length;
-    const total = visible.length;
+    const allVisible = [...monthly, ...quarterly];
+    const done = allVisible.filter(e => e.status === 'Done').length;
+    const total = allVisible.length;
     const pct = total ? Math.round((done / total) * 100) : 0;
     document.getElementById('calProgress').style.width = pct + '%';
+    document.getElementById('calDoneCount').textContent = done;
+    document.getElementById('calTotalCount').textContent = total;
+    document.getElementById('calAllDone').className = 'cal-all-done' + (done === total && total > 0 ? ' show' : '');
   }
 
   function calChangeMonth(delta) {
