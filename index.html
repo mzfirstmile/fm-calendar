@@ -1162,6 +1162,20 @@
       return;
     }
 
+    // Check if user has any module access (new users default to none)
+    if (userRecord && !userRecord.is_admin) {
+      const hasAnyAccess = userRecord.access_calendar || userRecord.access_financials ||
+        userRecord.access_forecasting || userRecord.access_exec ||
+        userRecord.access_properties || userRecord.access_users;
+      if (!hasAnyAccess) {
+        error.innerHTML = 'Your account is pending approval.<br><span style="font-size:11px;color:var(--text-dim)">An administrator needs to grant you access. Please check back later.</span>';
+        error.style.display = 'block';
+        document.getElementById('loginBtn').style.display = '';
+        document.getElementById('loginLoading').style.display = 'none';
+        return;
+      }
+    }
+
     // Set current user
     const name = account.name || email.split('@')[0];
     const parts = name.split(' ');
