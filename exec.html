@@ -517,6 +517,7 @@ const CAT_ICONS = {
   'PM Expenses': '🔧',
   'Software/Services': '💻',
   'Other Operating': '📋',
+  'Rent': '🏠',
   'Owner Distributions': '💸',
   'Investment Contributions': '🏗️'
 };
@@ -718,6 +719,11 @@ function categorize(record) {
   // Appfolio distributions (description contains APPFOLIO or SIGONFILE for property deposits)
   if (desc.includes('APPFOLIO') && amount > 0) {
     return { category: 'income', type: 'Investment Income' };
+  }
+
+  // Crown Acquisitions rent payments (~$8,089)
+  if (desc.includes('CROWN ACQUISITIONS') && amount < 0 && Math.abs(Math.abs(amount) - 8089) < 100) {
+    return { category: 'expense', type: 'Rent' };
   }
 
   // Main operating account logic
