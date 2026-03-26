@@ -2059,5 +2059,10 @@ async function confirmDeleteLiability(recordId) {
   } catch(e) { showToast('Error: ' + e.message); }
 }
 </script>
+<script>
+if (new URLSearchParams(location.search).get('embed') === '1') {
+  document.getElementById('mainHeader').style.display = 'none';
+}
+</script>
 </body>
 </html>

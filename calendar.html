@@ -186,7 +186,7 @@
 
 
 <!-- Main App -->
-<header>
+<header class="app-header">
   <h1 style="display:flex;align-items:center;gap:14px"><img src="First_Mile_Capital_Logo_RGB.png" style="height:44px;width:auto" alt="First Mile Capital"><span style="color:var(--text-dim);font-weight:400;font-size:14px">Accounting Calendar — 2026</span></h1>
   <div class="header-right">
     <div class="sync-pill live" id="syncPill" style="display:none"><div class="sync-dot"></div><span>Live</span></div>
@@ -588,5 +588,11 @@ You can answer questions about upcoming deadlines, what's overdue, who owns what
   </div>
 </div>
 <div class="toast" id="toast"></div>
+<script>
+if (new URLSearchParams(location.search).get('embed') === '1') {
+  document.querySelector('header').style.display = 'none';
+  document.querySelector('.setup-overlay')?.classList.add('hidden');
+}
+</script>
 </body>
 </html>
