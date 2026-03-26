@@ -1460,22 +1460,72 @@ function getInvField(r, key) { return r[key] !== undefined ? r[key] : null; }
 function getLiabField(r, key) { return r[key] !== undefined ? r[key] : null; }
 
 let bsProperties = []; // properties for linking to investments
+let propertyNOI = {};  // { propertyId -> annualNOI }
+let propertyDebt = {}; // { propertyId -> totalDebt }
 
 async function loadBalanceSheet() {
   try {
-    const [inv, liab, props] = await Promise.all([
+    const [inv, liab, props, bsItems] = await Promise.all([
       supaFetch('exec_investments', '?order=name.asc'),
       supaFetch('exec_liabilities', '?order=maturity_date.asc.nullslast'),
       supaFetch('properties', '?order=property_name.asc&select=id,property_name,current_valuation'),
+      supaFetch('balance_sheet_items', '?is_header=eq.false&is_total=eq.false&select=property_id,bs_code,amount,account_section'),
       fetchJpyRate()
     ]);
     bsProperties = props;
+
     // Build property lookup { id -> { name, valuation } }
     const propLookup = {};
     props.forEach(p => { propLookup[p.id] = { name: p.property_name, valuation: p.current_valuation }; });
+
+    // Fetch budget line items for 2026 with pagination (can be 6000+ rows)
+    let budgetItems = [];
+    let bOffset = 0;
+    const bPageSize = 1000;
+    while (true) {
+      const page = await supaFetch('budget_line_items', `?year=eq.2026&select=property_id,gl_code,amount&limit=${bPageSize}&offset=${bOffset}`);
+      budgetItems = budgetItems.concat(page);
+      if (page.length < bPageSize) break;
+      bOffset += bPageSize;
+    }
+    console.log('Balance sheet budget items loaded:', budgetItems.length);
+
+    // Compute NOI per property: Revenue (GL 4xxx) - |Expenses (GL 5xxx-6xxx)|
+    const propRevenue = {};
+    const propExpenses = {};
+    budgetItems.forEach(row => {
+      const gl = parseInt(row.gl_code) || 0;
+      const pid = row.property_id;
+      if (gl >= 4000 && gl < 5000) {
+        propRevenue[pid] = (propRevenue[pid] || 0) + (row.amount || 0);
+      } else if (gl >= 5000 && gl < 7000) {
+        propExpenses[pid] = (propExpenses[pid] || 0) + (row.amount || 0);
+      }
+    });
+    propertyNOI = {};
+    const allPropIds = new Set([...Object.keys(propRevenue), ...Object.keys(propExpenses)]);
+    allPropIds.forEach(pid => {
+      const rev = propRevenue[pid] || 0;
+      const exp = propExpenses[pid] || 0;
+      propertyNOI[pid] = rev - Math.abs(exp);
+    });
+    console.log('Property NOI:', Object.entries(propertyNOI).map(([k,v]) => `${k}: ${Math.round(v)}`));
+
+    // Compute total debt (liabilities) per property from balance sheet items (bs_code 2xxx)
+    propertyDebt = {};
+    bsItems.forEach(item => {
+      const code = parseInt(item.bs_code) || 0;
+      if (code >= 2000 && code < 3000) { // Liabilities section
+        if (!propertyDebt[item.property_id]) propertyDebt[item.property_id] = 0;
+        propertyDebt[item.property_id] += Math.abs(item.amount || 0);
+      }
+    });
+
     // Map to compatible format with .id at top level
     bsInvestments = inv.map(r => {
       const linked = r.property_id ? propLookup[r.property_id] : null;
+      const noi = r.property_id ? (propertyNOI[r.property_id] || 0) : 0;
+      const debt = r.property_id ? (propertyDebt[r.property_id] || 0) : 0;
       return {
         id: r.id,
         name: r.name,
@@ -1486,9 +1536,12 @@ async function loadBalanceSheet() {
         unreturned: r.unreturned_capital,
         netEquity: r.net_equity,
         valuation: r.valuation,
+        capRate: r.cap_rate || null,
         propertyId: r.property_id || null,
         propertyName: linked ? linked.name : null,
         propertyValuation: linked ? linked.valuation : null,
+        propertyNOI: noi,
+        propertyDebt: debt,
         status: r.status || '',
         membershipClass: r.membership_class || ''
       };
@@ -1530,14 +1583,23 @@ function getCashBalance() {
 function renderBalanceSheet() {
   const cash = getCashBalance();
 
-  // Investments total — linked properties use property valuation × ownership %, others use manual valuation or net_equity
+  // Investments total — linked properties use cap rate formula, others use manual valuation or net_equity
   let investmentsTotal = 0;
   const invCards = bsInvestments.map(r => {
     let value;
     let valueSource = 'manual';
-    if (r.propertyId && r.propertyValuation != null) {
-      // Linked to property: use property valuation × ownership %
-      const ownershipPct = r.ownership > 1 ? r.ownership / 100 : (r.ownership || 0);
+    let valuationDetails = null;
+    const ownershipPct = r.ownership > 1 ? r.ownership / 100 : (r.ownership || 0);
+
+    if (r.propertyId && r.capRate && r.capRate > 0 && r.propertyNOI > 0) {
+      // Linked with cap rate: (NOI / cap_rate) - debt, then × equity %
+      const grossValue = r.propertyNOI / (r.capRate / 100); // cap rate stored as %, convert to decimal
+      const netValue = grossValue - (r.propertyDebt || 0);
+      value = netValue * ownershipPct;
+      valueSource = 'caprate';
+      valuationDetails = { noi: r.propertyNOI, capRate: r.capRate, grossValue, debt: r.propertyDebt || 0, netValue, equityValue: value };
+    } else if (r.propertyId && r.propertyValuation != null && r.propertyValuation > 0) {
+      // Linked to property but no cap rate: use property valuation × ownership %
       value = r.propertyValuation * ownershipPct;
       valueSource = 'property';
     } else if (r.valuation != null && r.valuation > 0) {
@@ -1547,7 +1609,7 @@ function renderBalanceSheet() {
       valueSource = 'equity';
     }
     investmentsTotal += value;
-    return { id: r.id, name: r.name || 'Unknown', ownership: r.ownership || 0, committed: r.committed || 0, contributed: r.contributed || 0, distributed: r.distributed || 0, unreturned: r.unreturned || 0, valuation: r.valuation, netEquity: r.netEquity || 0, status: r.status, value, valueSource, propertyId: r.propertyId, propertyName: r.propertyName, propertyValuation: r.propertyValuation };
+    return { id: r.id, name: r.name || 'Unknown', ownership: r.ownership || 0, committed: r.committed || 0, contributed: r.contributed || 0, distributed: r.distributed || 0, unreturned: r.unreturned || 0, valuation: r.valuation, netEquity: r.netEquity || 0, status: r.status, value, valueSource, valuationDetails, propertyId: r.propertyId, propertyName: r.propertyName, propertyValuation: r.propertyValuation, capRate: r.capRate, propertyNOI: r.propertyNOI, propertyDebt: r.propertyDebt };
   });
 
   // Liabilities total (USD equivalent)
@@ -1598,14 +1660,41 @@ function renderBalanceSheet() {
       const linkedBadge = inv.propertyId
         ? `<span style="display:inline-block;font-size:9px;background:var(--accent);color:#fff;padding:2px 6px;border-radius:8px;margin-left:6px;vertical-align:middle;">Linked</span>`
         : '';
-      const valueNote = inv.valueSource === 'property'
-        ? `<div style="font-size:9px;color:var(--text-dim);margin-top:2px;">${fmt(inv.propertyValuation)} × ${ownershipDisplay}</div>`
-        : inv.valueSource === 'equity'
-        ? `<div style="font-size:9px;color:var(--text-dim);margin-top:2px;">Net equity (no valuation set)</div>`
-        : '';
-      const editBtn = inv.valueSource !== 'property'
+      let valueNote = '';
+      if (inv.valueSource === 'caprate' && inv.valuationDetails) {
+        const d = inv.valuationDetails;
+        valueNote = `<div style="font-size:9px;color:var(--text-dim);margin-top:4px;line-height:1.5;">
+          NOI ${fmt(d.noi)} ÷ ${d.capRate}% = ${fmt(d.grossValue)}<br>
+          − Debt ${fmt(d.debt)} = ${fmt(d.netValue)}<br>
+          × ${ownershipDisplay} = <b>${fmt(d.equityValue)}</b>
+        </div>`;
+      } else if (inv.valueSource === 'property') {
+        valueNote = `<div style="font-size:9px;color:var(--text-dim);margin-top:2px;">${fmt(inv.propertyValuation)} × ${ownershipDisplay}</div>`;
+      } else if (inv.valueSource === 'equity') {
+        valueNote = `<div style="font-size:9px;color:var(--text-dim);margin-top:2px;">Net equity (no valuation set)</div>`;
+      }
+      const editBtn = (inv.valueSource !== 'property' && inv.valueSource !== 'caprate')
         ? `<button class="bs-edit-btn" id="avBtn-${inv.id}" onclick="editAssetValue('${inv.id}', ${inv.value})" title="Edit value">✏️</button>`
         : '';
+      // Cap rate display for linked investments
+      const capRateDisplay = inv.capRate
+        ? `<span id="cr-${inv.id}" style="color:var(--accent);cursor:pointer;" onclick="editCapRate('${inv.id}', ${inv.capRate})">${inv.capRate.toFixed(2)}%</span> <button class="bs-edit-btn" onclick="editCapRate('${inv.id}', ${inv.capRate})" title="Edit cap rate" style="font-size:10px;">✏️</button>`
+        : `<span style="font-size:10px;color:var(--text-dim);cursor:pointer;" onclick="editCapRate('${inv.id}', 0)">Set rate</span>`;
+      const capRateRow = inv.propertyId ? `
+          <div class="bs-card-metrics" style="margin-top:4px;">
+            <div class="bs-metric">
+              <div class="bs-metric-label">2026 NOI</div>
+              <div class="bs-metric-value">${inv.propertyNOI ? fmt(inv.propertyNOI) : '—'}</div>
+            </div>
+            <div class="bs-metric">
+              <div class="bs-metric-label">Property Debt</div>
+              <div class="bs-metric-value" style="color:var(--red-dark)">${inv.propertyDebt ? fmt(inv.propertyDebt) : '—'}</div>
+            </div>
+            <div class="bs-metric">
+              <div class="bs-metric-label">Cap Rate</div>
+              <div class="bs-metric-value" id="crWrap-${inv.id}">${capRateDisplay}</div>
+            </div>
+          </div>` : '';
       return `
         <div class="bs-card">
           <div class="bs-card-header">
@@ -1627,10 +1716,10 @@ function renderBalanceSheet() {
               <div class="bs-metric-label">Distributed</div>
               <div class="bs-metric-value green">${fmt(inv.distributed)}</div>
             </div>
-          </div>
+          </div>${capRateRow}
           <div class="bs-card-asset-row">
             <div>
-              <div class="bs-metric-label">Asset Value</div>
+              <div class="bs-metric-label">Position Value</div>
               <div class="bs-asset-value" id="av-${inv.id}">${fmt(inv.value)}</div>
               ${valueNote}
             </div>
@@ -1702,7 +1791,7 @@ function closeModal() {
   document.getElementById('modalOverlay').classList.remove('open');
 }
 
-// ── Asset Value inline edit ──
+// ── Position Value inline edit ──
 function editAssetValue(recordId, currentValue) {
   const el = document.getElementById(`av-${recordId}`);
   const btnEl = document.getElementById(`avBtn-${recordId}`);
@@ -1721,7 +1810,30 @@ async function saveAssetValue(recordId) {
   if (isNaN(val)) { showToast('Invalid number'); return; }
   try {
     await supaWrite('exec_investments', 'PATCH', { valuation: val }, `?id=eq.${recordId}`);
-    showToast('Asset value updated');
+    showToast('Position value updated');
+    await loadBalanceSheet();
+  } catch(e) { showToast('Error: ' + e.message); }
+}
+
+// ── Cap Rate inline edit ──
+function editCapRate(recordId, currentRate) {
+  const wrap = document.getElementById(`crWrap-${recordId}`);
+  if (!wrap) return;
+  const val = currentRate || '';
+  wrap.innerHTML = `<input class="bs-edit-input" id="crInput-${recordId}" type="number" step="0.01" value="${val}" placeholder="e.g. 7.5" style="width:60px;font-size:12px;" onkeydown="if(event.key==='Enter')saveCapRate('${recordId}');if(event.key==='Escape'){loadBalanceSheet();}">
+    <button class="bs-edit-btn" onclick="saveCapRate('${recordId}')" style="font-size:10px;">✓</button>`;
+  const inp = document.getElementById(`crInput-${recordId}`);
+  inp.focus();
+  inp.select();
+}
+
+async function saveCapRate(recordId) {
+  const inp = document.getElementById(`crInput-${recordId}`);
+  const val = parseFloat(inp.value);
+  if (isNaN(val) || val <= 0) { showToast('Enter a valid cap rate %'); return; }
+  try {
+    await supaWrite('exec_investments', 'PATCH', { cap_rate: val }, `?id=eq.${recordId}`);
+    showToast('Cap rate updated');
     await loadBalanceSheet();
   } catch(e) { showToast('Error: ' + e.message); }
 }
@@ -1741,15 +1853,18 @@ function onPropertyLinkChange() {
   const sel = document.getElementById('invPropertyId');
   const valInput = document.getElementById('invValuation');
   const valLabel = document.getElementById('invValuationLabel');
+  const capRow = document.getElementById('capRateRow');
   if (sel.value) {
     valInput.disabled = true;
-    valInput.placeholder = 'Auto from property × ownership %';
+    valInput.placeholder = 'Auto: (NOI ÷ Cap Rate) − Debt × Equity %';
     valInput.value = '';
     if (valLabel) valLabel.style.opacity = '0.5';
+    if (capRow) capRow.style.display = '';
   } else {
     valInput.disabled = false;
     valInput.placeholder = 'Enter asset value';
     if (valLabel) valLabel.style.opacity = '1';
+    if (capRow) capRow.style.display = 'none';
   }
 }
 
@@ -1762,11 +1877,15 @@ function openAddInvestment() {
     <select id="invPropertyId" onchange="onPropertyLinkChange()" style="width:100%;padding:8px;border:1px solid var(--border);border-radius:6px;background:var(--card);color:var(--text);font-size:13px;">${buildPropertyOptions(null)}</select>
     <label>Ownership %</label>
     <input id="invOwnership" type="number" step="0.01" placeholder="e.g. 15.17">
+    <div id="capRateRow" style="display:none;">
+      <label>Cap Rate (%)</label>
+      <input id="invCapRate" type="number" step="0.01" placeholder="e.g. 7.5">
+    </div>
     <label>Contributed ($)</label>
     <input id="invContributed" type="number" step="0.01" placeholder="e.g. 4780417">
     <label>Distributed ($)</label>
     <input id="invDistributed" type="number" step="0.01" placeholder="0" value="0">
-    <label id="invValuationLabel">Asset Value ($)</label>
+    <label id="invValuationLabel">Position Value ($)</label>
     <input id="invValuation" type="number" step="0.01" placeholder="Enter asset value">
     <div class="modal-actions">
       <button onclick="closeModal()">Cancel</button>
@@ -1779,11 +1898,13 @@ async function saveNewInvestment() {
   const name = document.getElementById('invName').value.trim();
   const propertyId = document.getElementById('invPropertyId').value || null;
   const ownership = parseFloat(document.getElementById('invOwnership').value) || 0;
+  const capRateEl = document.getElementById('invCapRate');
+  const capRate = capRateEl ? (parseFloat(capRateEl.value) || null) : null;
   const contributed = parseFloat(document.getElementById('invContributed').value) || 0;
   const distributed = parseFloat(document.getElementById('invDistributed').value) || 0;
   const valuation = propertyId ? null : (parseFloat(document.getElementById('invValuation').value) || null);
   if (!name) { showToast('Name required'); return; }
-  const body = { name, ownership_pct: ownership, contributed, distributed, property_id: propertyId };
+  const body = { name, ownership_pct: ownership, contributed, distributed, property_id: propertyId, cap_rate: capRate };
   if (valuation) body.valuation = valuation;
   try {
     await supaWrite('exec_investments', 'POST', body);
@@ -1801,6 +1922,7 @@ function openEditInvestment(recordId) {
   const contributed = r.contributed || 0;
   const distributed = r.distributed || 0;
   const valuation = r.valuation || '';
+  const capRate = r.capRate || '';
   const isLinked = !!r.propertyId;
   openModal(`
     <h3>Edit Investment</h3>
@@ -1810,12 +1932,16 @@ function openEditInvestment(recordId) {
     <select id="invPropertyId" onchange="onPropertyLinkChange()" style="width:100%;padding:8px;border:1px solid var(--border);border-radius:6px;background:var(--card);color:var(--text);font-size:13px;">${buildPropertyOptions(r.propertyId)}</select>
     <label>Ownership %</label>
     <input id="invOwnership" type="number" step="0.01" value="${ownership}">
+    <div id="capRateRow" ${isLinked ? '' : 'style="display:none;"'}>
+      <label>Cap Rate (%)</label>
+      <input id="invCapRate" type="number" step="0.01" value="${capRate}" placeholder="e.g. 7.5">
+    </div>
     <label>Contributed ($)</label>
     <input id="invContributed" type="number" step="0.01" value="${contributed}">
     <label>Distributed ($)</label>
     <input id="invDistributed" type="number" step="0.01" value="${distributed}">
-    <label id="invValuationLabel" ${isLinked ? 'style="opacity:0.5"' : ''}>Asset Value ($)</label>
-    <input id="invValuation" type="number" step="0.01" value="${valuation}" ${isLinked ? 'disabled placeholder="Auto from property × ownership %"' : ''}>
+    <label id="invValuationLabel" ${isLinked ? 'style="opacity:0.5"' : ''}>Position Value ($)</label>
+    <input id="invValuation" type="number" step="0.01" value="${valuation}" ${isLinked ? 'disabled placeholder="Auto: (NOI ÷ Cap Rate) − Debt × Equity %"' : ''}>
     <div class="modal-actions">
       <button onclick="closeModal()">Cancel</button>
       <button class="primary" onclick="saveEditInvestment('${recordId}')">Save</button>
@@ -1827,12 +1953,14 @@ async function saveEditInvestment(recordId) {
   const name = document.getElementById('invName').value.trim();
   const propertyId = document.getElementById('invPropertyId').value || null;
   const ownership = parseFloat(document.getElementById('invOwnership').value) || 0;
+  const capRateEl = document.getElementById('invCapRate');
+  const capRate = capRateEl ? (parseFloat(capRateEl.value) || null) : null;
   const contributed = parseFloat(document.getElementById('invContributed').value) || 0;
   const distributed = parseFloat(document.getElementById('invDistributed').value) || 0;
   const valuation = propertyId ? null : (parseFloat(document.getElementById('invValuation').value) || null);
   if (!name) { showToast('Name required'); return; }
   try {
-    await supaWrite('exec_investments', 'PATCH', { name, ownership_pct: ownership, contributed, distributed, valuation: valuation || 0, property_id: propertyId }, `?id=eq.${recordId}`);
+    await supaWrite('exec_investments', 'PATCH', { name, ownership_pct: ownership, contributed, distributed, valuation: valuation || 0, property_id: propertyId, cap_rate: capRate }, `?id=eq.${recordId}`);
     closeModal();
     showToast('Investment updated');
     await loadBalanceSheet();
