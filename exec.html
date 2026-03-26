@@ -1200,6 +1200,19 @@ function openDrilldown(type, cssClass) {
         drillItems.push({ date: getDate(r), desc: `Payroll reimb. split from: ${getDescription(r).slice(0,60)}…`, acct: getAccountName(r), amount: splitAmt, recordId: null, currentType: 'Payroll Reimbursement', isSynthetic: true });
       }
     });
+  } else if (type === 'Property Management Fee Income') {
+    // PM Fee: show each transaction, then subtract payroll splits as deductions
+    records.forEach(r => {
+      const { type: t } = categorize(r);
+      if (t === type) {
+        drillItems.push({ date: getDate(r), desc: getDescription(r), acct: getAccountName(r), amount: getAmount(r), recordId: r.id, currentType: t, isSynthetic: false });
+        // If this transaction has a payroll split, add a synthetic deduction line
+        const splitAmt = payrollSplits[r.id];
+        if (splitAmt && splitAmt > 0) {
+          drillItems.push({ date: getDate(r), desc: `Less: Payroll Reimbursement`, acct: getAccountName(r), amount: -splitAmt, recordId: null, currentType: 'Payroll Reimbursement', isSynthetic: true });
+        }
+      }
+    });
   } else {
     // Standard: find records matching this category
     records.forEach(r => {
@@ -1215,9 +1228,20 @@ function openDrilldown(type, cssClass) {
 
   document.getElementById('drilldownTitle').textContent = `${type} — ${period.label}`;
 
-  // For Payroll, add a summary bar showing debits/credits/net
+  // Summary bars for special drilldowns
   let summaryHtml = '';
-  if (type === 'Payroll') {
+  if (type === 'Property Management Fee Income') {
+    const gross = drillItems.filter(d => !d.isSynthetic).reduce((s, d) => s + d.amount, 0);
+    const deductions = drillItems.filter(d => d.isSynthetic).reduce((s, d) => s + d.amount, 0);
+    const net = gross + deductions;
+    if (deductions !== 0) {
+      summaryHtml = `<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;margin-bottom:20px;padding:16px;background:var(--surface2);border-radius:10px;">
+        <div style="text-align:center;"><div style="font-size:10px;font-weight:600;color:var(--text-dim);text-transform:uppercase;letter-spacing:.3px;margin-bottom:4px;">Gross PM Fee</div><div style="font-size:18px;font-weight:700;color:var(--green-dark);">${fmtFull(gross)}</div></div>
+        <div style="text-align:center;"><div style="font-size:10px;font-weight:600;color:var(--text-dim);text-transform:uppercase;letter-spacing:.3px;margin-bottom:4px;">Payroll Deductions</div><div style="font-size:18px;font-weight:700;color:var(--red-dark);">${fmtFull(deductions)}</div></div>
+        <div style="text-align:center;"><div style="font-size:10px;font-weight:600;color:var(--text-dim);text-transform:uppercase;letter-spacing:.3px;margin-bottom:4px;">Net PM Fee</div><div style="font-size:18px;font-weight:700;color:var(--accent);">${fmtFull(net)}</div></div>
+      </div>`;
+    }
+  } else if (type === 'Payroll') {
     const debits = drillItems.filter(d => d.amount < 0).reduce((s, d) => s + d.amount, 0);
     const credits = drillItems.filter(d => d.amount > 0).reduce((s, d) => s + d.amount, 0);
     const net = debits + credits;
