@@ -1644,7 +1644,6 @@ function renderBalanceSheet() {
       value = r.netEquity || 0;
       valueSource = 'equity';
     }
-    console.log(`[BS] ${r.name}: value=${value}, source=${valueSource}, valuation=${r.valuation}, netEquity=${r.netEquity}, contributed=${r.contributed}, ownership=${ownershipPct}, propertyId=${r.propertyId}, capRate=${r.capRate}, NOI=${r.propertyNOI}, debt=${r.propertyDebt}`);
     investmentsTotal += value;
     return { id: r.id, name: r.name || 'Unknown', ownership: r.ownership || 0, committed: r.committed || 0, contributed: r.contributed || 0, distributed: r.distributed || 0, unreturned: r.unreturned || 0, valuation: r.valuation, netEquity: r.netEquity || 0, status: r.status, value, valueSource, valuationDetails, propertyId: r.propertyId, propertyName: r.propertyName, propertyValuation: r.propertyValuation, capRate: r.capRate, propertyNOI: r.propertyNOI, propertyDebt: r.propertyDebt };
   });
@@ -1667,6 +1666,28 @@ function renderBalanceSheet() {
 
   const totalAssets = cash + investmentsTotal;
   const netPosition = totalAssets - liabilitiesTotal;
+
+  // Detailed asset breakdown for debugging
+  console.log('%c═══ TOTAL ASSETS BREAKDOWN ═══', 'color:#f90;font-weight:bold;font-size:14px');
+  console.log(`%cCash (sum of latest ledger balances): $${cash.toLocaleString('en-US', {minimumFractionDigits:2})}`, 'color:#4fc3f7');
+  console.log('%c─── Investments ───', 'color:#f90;font-weight:bold');
+  invCards.forEach(inv => {
+    let formula = '';
+    if (inv.valueSource === 'caprate') {
+      const d = inv.valuationDetails;
+      formula = `  NOI $${d.noi.toLocaleString()} / ${d.capRate}% cap = $${d.grossValue.toLocaleString()} gross − $${d.debt.toLocaleString()} debt = $${d.netValue.toLocaleString()} × ${(inv.ownership > 1 ? inv.ownership : inv.ownership*100).toFixed(2)}% ownership`;
+    } else if (inv.valueSource === 'property') {
+      formula = `  Property valuation $${(inv.propertyValuation||0).toLocaleString()} × ${(inv.ownership > 1 ? inv.ownership : inv.ownership*100).toFixed(2)}% ownership`;
+    } else if (inv.valueSource === 'manual') {
+      formula = `  Manual valuation entered`;
+    } else {
+      formula = `  Fallback to net equity (contributed − distributed)`;
+    }
+    console.log(`%c${inv.name}: $${inv.value.toLocaleString('en-US', {minimumFractionDigits:2})}  [${inv.valueSource}]`, 'color:#66bb6a;font-weight:bold');
+    console.log(`  ${formula}`);
+  });
+  console.log(`%c─── Investments subtotal: $${investmentsTotal.toLocaleString('en-US', {minimumFractionDigits:2})}`, 'color:#66bb6a');
+  console.log(`%c═══ TOTAL ASSETS = Cash $${cash.toLocaleString('en-US', {minimumFractionDigits:2})} + Investments $${investmentsTotal.toLocaleString('en-US', {minimumFractionDigits:2})} = $${totalAssets.toLocaleString('en-US', {minimumFractionDigits:2})} ═══`, 'color:#f90;font-weight:bold;font-size:13px');
 
   // Render summary bar
   document.getElementById('bsTotalAssets').textContent = fmt(totalAssets);
