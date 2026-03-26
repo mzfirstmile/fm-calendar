@@ -2500,16 +2500,13 @@ Budget data is available via get_budget_summary for: 61 S Paramus (281,504 SF), 
 
         // Load reserve draws
         try {
-          const drawResp = await supaFetch('/rest/v1/reserve_draws?order=year.asc,month.asc');
-          if (drawResp.ok) {
-            const draws = await drawResp.json();
-            fbReserveDraws = {};
-            draws.forEach(d => {
-              if (!fbReserveDraws[d.property_id]) fbReserveDraws[d.property_id] = [];
-              fbReserveDraws[d.property_id].push(d);
-            });
-            console.log('Reserve draws loaded:', draws.length);
-          }
+          const draws = await supaFetch('reserve_draws', '?order=year.asc,month.asc');
+          fbReserveDraws = {};
+          draws.forEach(d => {
+            if (!fbReserveDraws[d.property_id]) fbReserveDraws[d.property_id] = [];
+            fbReserveDraws[d.property_id].push(d);
+          });
+          console.log('Reserve draws loaded:', draws.length);
         } catch(e) { console.warn('Reserve draws not loaded:', e); }
 
         // Combine both sources
@@ -2926,9 +2923,8 @@ Budget data is available via get_budget_summary for: 61 S Paramus (281,504 SF), 
     body.innerHTML = '<div style="text-align:center;padding:40px;color:var(--text-dim)">Loading balance sheet...</div>';
 
     try {
-      const resp = await supaFetch(`/rest/v1/balance_sheet_items?property_id=eq.${propId}&order=sort_order.asc`);
-      if (!resp.ok) throw new Error('Failed to fetch');
-      const items = await resp.json();
+      console.log('Fetching balance sheet for property:', propId);
+      const items = await supaFetch('balance_sheet_items', `?property_id=eq.${propId}&order=sort_order.asc`);
       if (!items.length) {
         body.innerHTML = '<div style="text-align:center;padding:40px;color:var(--text-dim)">No balance sheet data available for this property.</div>';
         return;
