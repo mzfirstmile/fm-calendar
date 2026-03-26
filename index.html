@@ -1816,12 +1816,19 @@ Budget data is available via get_budget_summary for: 61 S Paramus (281,504 SF), 
     if (!bgtLoaded) {
       bgtLoaded = true;
       try {
-        // Load GL accounts and budget data from Supabase in parallel
-        // Note: Supabase REST defaults to 1000 rows — we need all ~4200
-        const [gl, budgetRows] = await Promise.all([
-          fbLoadGlAccounts(),
-          supaFetch('budget_line_items', '?year=eq.2026&order=property_id,gl_code,month&limit=10000')
-        ]);
+        // Load GL accounts
+        const gl = await fbLoadGlAccounts();
+        // Supabase REST caps at 1000 rows per request — paginate to get all ~4200
+        let budgetRows = [];
+        let offset = 0;
+        const pageSize = 1000;
+        while (true) {
+          const page = await supaFetch('budget_line_items', `?year=eq.2026&order=property_id,gl_code,month&limit=${pageSize}&offset=${offset}`);
+          budgetRows = budgetRows.concat(page);
+          if (page.length < pageSize) break;
+          offset += pageSize;
+        }
+        console.log('Budget rows loaded:', budgetRows.length);
 
         // Group by property
         const byProp = {};
