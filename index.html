@@ -1364,7 +1364,17 @@
     exec: 'Executive <span>Financials</span>',
   };
 
-  function switchView(view) {
+  let currentView = 'home';
+
+  function switchView(view, pushHistory = true) {
+    currentView = view;
+
+    // Push to browser history so back/forward buttons work
+    if (pushHistory) {
+      const hash = view === 'home' ? '' : `#${view}`;
+      history.pushState({ view }, '', hash || window.location.pathname);
+    }
+
     // Update sidebar
     document.querySelectorAll('.sidebar-item').forEach(el => el.classList.remove('active'));
     const sidebarItem = document.querySelector(`.sidebar-item[data-view="${view}"]`);
@@ -1400,6 +1410,29 @@
       if (frame && !frame.src) frame.src = frame.dataset.src;
     }
   }
+
+  // Handle browser back/forward buttons
+  window.addEventListener('popstate', function(e) {
+    const view = (e.state && e.state.view) || getViewFromHash() || 'home';
+    switchView(view, false);
+  });
+
+  function getViewFromHash() {
+    const hash = window.location.hash.replace('#', '');
+    return hash || null;
+  }
+
+  // On initial load, restore view from hash if present
+  (function() {
+    const initialView = getViewFromHash();
+    if (initialView && initialView !== 'home') {
+      // Replace current history entry so first back goes to previous page, not home
+      history.replaceState({ view: initialView }, '', `#${initialView}`);
+      switchView(initialView, false);
+    } else {
+      history.replaceState({ view: 'home' }, '', window.location.pathname);
+    }
+  })();
 
   // ── Sidebar click handlers ──
   document.querySelectorAll('.sidebar-item').forEach(item => {
