@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>First Mile Capital — Admin</title>
-<link rel="icon" type="image/png" href="favicon.png">
+<link rel="icon" type="image/png" href="assets/favicon.png">
 <style>
   :root {
     --bg: #e2e6ef;
@@ -691,7 +691,7 @@
 <!-- ── Sidebar ── -->
 <nav class="sidebar">
   <div class="sidebar-logo" onclick="switchView('home')" style="cursor:pointer">
-    <img src="First_Mile_Capital_Logo_KO_White.png" alt="First Mile Capital">
+    <img src="assets/First_Mile_Capital_Logo_KO_White.png" alt="First Mile Capital">
   </div>
 
   <div class="sidebar-section">
@@ -733,7 +733,7 @@
 <div class="main">
   <div class="topbar">
     <div class="topbar-left">
-      <div class="topbar-logo" onclick="switchView('home')" style="cursor:pointer"><img src="First_Mile_Capital_Logo_RGB.png" alt="First Mile Capital"></div>
+      <div class="topbar-logo" onclick="switchView('home')" style="cursor:pointer"><img src="assets/First_Mile_Capital_Logo_RGB.png" alt="First Mile Capital"></div>
       <div class="topbar-divider"></div>
       <div class="topbar-module" id="topbar-module"></div>
     </div>
@@ -1648,7 +1648,7 @@
       return JSON.stringify(data);
     }
     if (name === 'get_budget_summary') {
-      if (!bgtData) { try { const r = await fetch('budget-data.json'); bgtData = await r.json(); } catch(e) { return 'Budget data not available'; } }
+      if (!bgtData) { try { const r = await fetch('data/budget-data.json'); bgtData = await r.json(); } catch(e) { return 'Budget data not available'; } }
       const prop = bgtData.find(p => p.name.toLowerCase().includes(input.propertyName.toLowerCase()));
       if (!prop) return 'Property not found. Available: ' + bgtData.map(p => p.name).join(', ');
       const summary = prop.rows.filter(r => r.isTotal || r.isHeader).map(r => ({
@@ -1736,11 +1736,11 @@ Budget data is available via get_budget_summary for: 61 S Paramus (281,504 SF), 
 
   // Photo map: property name → image path
   const FB_PHOTOS = {
-    '61 S Paramus': 'Property Photos/61south.png',
-    'Paramus Plaza': 'Property Photos/paramusplaza.png',
-    '575 Broadway': 'Property Photos/575broadway.jpg',
-    '1700 East Putnam': 'Property Photos/1700eastputnam.png',
-    '340 Mount Kemble': 'Property Photos/340mk.jpg',
+    '61 S Paramus': 'assets/Property Photos/61south.png',
+    'Paramus Plaza': 'assets/Property Photos/paramusplaza.png',
+    '575 Broadway': 'assets/Property Photos/575broadway.jpg',
+    '1700 East Putnam': 'assets/Property Photos/1700eastputnam.png',
+    '340 Mount Kemble': 'assets/Property Photos/340mk.jpg',
   };
 
   // Year-specific totals for chart: { propertyName: { 2025: {rev,exp,noi}, 2026: {...}, 2027: {...} } }
@@ -1750,7 +1750,7 @@ Budget data is available via get_budget_summary for: 61 S Paramus (281,504 SF), 
     if (!bgtLoaded) {
       bgtLoaded = true;
       try {
-        const r = await fetch('budget-data.json');
+        const r = await fetch('data/budget-data.json');
         bgtData = await r.json();
         // Build year-specific chart data
         bgtData.forEach(p => {
