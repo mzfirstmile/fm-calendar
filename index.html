@@ -1817,9 +1817,10 @@ Budget data is available via get_budget_summary for: 61 S Paramus (281,504 SF), 
       bgtLoaded = true;
       try {
         // Load GL accounts and budget data from Supabase in parallel
+        // Note: Supabase REST defaults to 1000 rows — we need all ~4200
         const [gl, budgetRows] = await Promise.all([
           fbLoadGlAccounts(),
-          supaFetch('budget_line_items', '?year=eq.2026&order=property_id,gl_code,month')
+          supaFetch('budget_line_items', '?year=eq.2026&order=property_id,gl_code,month&limit=10000')
         ]);
 
         // Group by property
@@ -1907,13 +1908,23 @@ Budget data is available via get_budget_summary for: 61 S Paramus (281,504 SF), 
             }
           });
 
-          // Compute totals
+          // Compute totals — use dedicated total rows if available, otherwise sum from detail rows
           const totalIncomeRow = summaryRows.find(r => r.label === 'TOTAL INCOME');
           const noiRow = summaryRows.find(r => r.label === 'NET OPERATING INCOME');
           const totalExpRow = summaryRows.find(r => r.label === 'TOTAL OPERATING EXPENSES' || r.label === 'TOTAL BUILDING EXPENSES');
-          const totalIncome = totalIncomeRow ? totalIncomeRow.budget26 : 0;
-          const noi = noiRow ? noiRow.budget26 : 0;
-          const totalExpenses = totalExpRow ? Math.abs(totalExpRow.budget26) : (totalIncome - noi);
+          let totalIncome = totalIncomeRow ? totalIncomeRow.budget26 : 0;
+          let noi = noiRow ? noiRow.budget26 : 0;
+          let totalExpenses = totalExpRow ? Math.abs(totalExpRow.budget26) : 0;
+          // Fallback: compute from detail rows if total rows not found
+          if (!totalIncome) {
+            totalIncome = detailRows.filter(r => r.section === 'revenue').reduce((s, r) => s + MONTHS.reduce((ms, m) => ms + (r.months[m] || 0), 0), 0);
+          }
+          if (!totalExpenses) {
+            totalExpenses = Math.abs(detailRows.filter(r => r.section === 'opex').reduce((s, r) => s + MONTHS.reduce((ms, m) => ms + (r.months[m] || 0), 0), 0));
+          }
+          if (!noi) {
+            noi = totalIncome - totalExpenses;
+          }
 
           bgtData.push({
             name: meta.name,
