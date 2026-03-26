@@ -2096,7 +2096,7 @@
         type: 'object',
         properties: {
           recordId: { type: 'number', description: 'The transaction ID from exec_transactions' },
-          category: { type: 'string', description: 'New category name. Valid categories: Asset Management Fee Income, Property Management Fee Income, Investment Income, Other Income, Payroll, Credit Cards, Legal/Corp Services, Taxes, Wire Payments, Banking, Checks, AM Partner Payout, PM Expenses, Software/Services, Other Operating, Internal Transfer, Payroll Reimbursement, Investor Contribution (Pass-Through)' }
+          category: { type: 'string', description: 'New category name. Valid categories: Asset Management Fee Income, Property Management Fee Income, Investment Income, Other Income, Payroll, Credit Cards, Legal/Corp Services, Taxes, Wire Payments, Banking, Checks, AM Partner Payout, PM Expenses, Software/Services, Other Operating, Internal Transfer, Payroll Reimbursement, Investor Contribution (Pass-Through), Travel, Finders Fee, Interest Expense' }
         },
         required: ['recordId', 'category']
       }
@@ -2156,7 +2156,7 @@ Use PostgREST query syntax. Budget data is available via get_budget_summary for:
 
 TRANSACTION CATEGORIZATION:
 You can recategorize exec_transactions using the recategorize_transaction tool. First query to find the transaction(s), then recategorize.
-Valid categories: Asset Management Fee Income, Property Management Fee Income, Investment Income, Other Income, Payroll, Credit Cards, Legal/Corp Services, Taxes, Wire Payments, Banking, Checks, AM Partner Payout, PM Expenses, Software/Services, Other Operating, Internal Transfer, Payroll Reimbursement, Investor Contribution (Pass-Through).
+Valid categories: Asset Management Fee Income, Property Management Fee Income, Investment Income, Other Income, Payroll, Credit Cards, Legal/Corp Services, Taxes, Wire Payments, Banking, Checks, AM Partner Payout, PM Expenses, Software/Services, Other Operating, Internal Transfer, Payroll Reimbursement, Investor Contribution (Pass-Through), Travel, Finders Fee, Interest Expense.
 
 ACCOUNT CONTEXT:
 - Corporate accounts: First Mile Capital (checking/savings), First Mile Management, Member accounts (Paramus, Plaza, Kemble, Red)
