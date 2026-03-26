@@ -596,18 +596,9 @@
   .fb-year-badge.planning-badge { background:rgba(0,176,212,.12); color:var(--accent); }
   .fb-year-badge.historical-badge { background:rgba(255,255,255,.06); color:var(--text-dim); }
 
-  .fb-detail-header-row { display:flex; gap:16px; margin-bottom:16px; }
-  .fb-detail-header {
-    flex:0 0 auto; display:flex; align-items:center; gap:16px; padding:16px 20px;
-    background:var(--surface); border-radius:12px; border:1px solid var(--border);
-  }
-  .fb-detail-header-left { flex:0 0 auto; display:flex; align-items:center; gap:14px; }
-  .fb-detail-header-img { width:60px; height:42px; border-radius:6px; object-fit:cover; }
-  .fb-detail-header-info h2 { font-size:16px; font-weight:700; margin-bottom:2px; }
-  .fb-detail-header-info p { font-size:11px; color:var(--text-dim); }
   .fb-chart-card {
-    flex:1; background:var(--surface); border-radius:12px; border:1px solid var(--border);
-    padding:14px 18px; display:flex; flex-direction:column; min-height:160px;
+    background:var(--surface); border-radius:12px; border:1px solid var(--border);
+    padding:14px 18px; display:flex; flex-direction:column; min-height:240px;
   }
   .fb-chart-card-title { font-size:11px; font-weight:700; color:var(--text-dim); text-transform:uppercase; letter-spacing:.4px; margin-bottom:8px; display:flex; justify-content:space-between; align-items:center; }
   .fb-chart-legend { display:flex; gap:14px; font-size:10px; color:var(--text-dim); }
@@ -633,10 +624,10 @@
   .fb-nav-btn.active { background:var(--accent); color:#fff; }
 
   /* Detail tab: monthly table */
-  .fb-monthly-table { width:100%; border-collapse:collapse; font-size:11px; white-space:nowrap; }
-  .fb-monthly-table th, .fb-monthly-table td { padding:6px 8px; text-align:right; border-bottom:1px solid var(--border); }
+  .fb-monthly-table { width:100%; border-collapse:collapse; font-size:11px; white-space:nowrap; table-layout:fixed; }
+  .fb-monthly-table th, .fb-monthly-table td { padding:5px 6px; text-align:right; border-bottom:1px solid var(--border); overflow:hidden; text-overflow:ellipsis; }
   .fb-monthly-table th { background:var(--surface2); font-weight:600; color:var(--text-dim); font-size:10px; text-transform:uppercase; letter-spacing:.3px; position:sticky; top:0; z-index:2; }
-  .fb-monthly-table td:first-child, .fb-monthly-table th:first-child { text-align:left; font-weight:500; min-width:200px; position:sticky; left:0; background:var(--surface); z-index:1; }
+  .fb-monthly-table td:first-child, .fb-monthly-table th:first-child { text-align:left; font-weight:500; min-width:180px; width:180px; position:sticky; left:0; background:var(--surface); z-index:1; white-space:normal; }
   .fb-monthly-table th:first-child { background:var(--surface2); z-index:3; }
   .fb-monthly-table .fb-cat-header td { background:var(--surface2); font-weight:700 !important; font-size:11px; color:var(--text); border-top:2px solid var(--border); cursor:pointer; user-select:none; }
   .fb-monthly-table .fb-cat-header:hover td { background:rgba(0,176,212,.06); }
@@ -647,7 +638,7 @@
   .fb-monthly-table .fb-cat-total td:first-child { color:var(--accent); }
   .fb-monthly-table .gl-code { color:var(--text-dim); font-size:10px; font-weight:400; margin-left:4px; }
   .fb-monthly-table .vendor-name { color:var(--text-dim); font-size:10px; display:block; font-weight:400; }
-  .fb-monthly-table td.fb-gl-cell { text-align:center; color:var(--text-dim); font-size:10px; font-family:monospace; min-width:50px; }
+  .fb-monthly-table td.fb-gl-cell { text-align:center; color:var(--text-dim); font-size:10px; font-family:monospace; width:44px; }
   .fb-monthly-table td.fb-editable { cursor:pointer; position:relative; }
   .fb-monthly-table td.fb-editable:hover { background:rgba(0,176,212,.08); }
   .fb-monthly-table td.fb-editing { padding:2px; }
@@ -691,9 +682,50 @@
     .module-grid { grid-template-columns: 1fr; }
     .chat-panel { width:calc(100vw - 20px); right:10px; bottom:80px; }
   }
+
+  /* ── Login Overlay ── */
+  .login-overlay {
+    position:fixed; inset:0; z-index:9999;
+    background:linear-gradient(135deg, #1e2d44 0%, #283d55 50%, #1a3350 100%);
+    display:flex; align-items:center; justify-content:center;
+    transition:opacity .4s; opacity:1;
+  }
+  .login-overlay.hidden { opacity:0; pointer-events:none; }
+  .login-card {
+    background:#fff; border-radius:16px; padding:48px 40px; width:380px;
+    box-shadow:0 20px 60px rgba(0,0,0,.3); text-align:center;
+  }
+  .login-card img { height:36px; margin-bottom:24px; }
+  .login-card h2 { font-size:20px; font-weight:700; color:#1e2d44; margin-bottom:6px; }
+  .login-card p { font-size:13px; color:#6b7d96; margin-bottom:28px; }
+  .login-btn {
+    display:inline-flex; align-items:center; gap:10px;
+    background:#1e2d44; color:#fff; border:none; border-radius:8px;
+    padding:12px 28px; font-size:14px; font-weight:600; cursor:pointer;
+    transition:background .2s;
+  }
+  .login-btn:hover { background:#00b0d4; }
+  .login-btn svg { width:20px; height:20px; }
+  .login-error { color:#e5534b; font-size:12px; margin-top:16px; display:none; }
+  .login-loading { color:#6b7d96; font-size:12px; margin-top:16px; display:none; }
 </style>
 </head>
 <body>
+
+<!-- ── Login Overlay ── -->
+<div class="login-overlay" id="loginOverlay">
+  <div class="login-card">
+    <img src="assets/First_Mile_Capital_Logo_RGB.png" alt="First Mile Capital">
+    <h2>Admin Portal</h2>
+    <p>Sign in with your First Mile Capital account</p>
+    <button class="login-btn" id="loginBtn" onclick="msalLogin()">
+      <svg viewBox="0 0 21 21"><rect x="1" y="1" width="9" height="9" fill="#f25022"/><rect x="11" y="1" width="9" height="9" fill="#7fba00"/><rect x="1" y="11" width="9" height="9" fill="#00a4ef"/><rect x="11" y="11" width="9" height="9" fill="#ffb900"/></svg>
+      Sign in with Microsoft
+    </button>
+    <div class="login-loading" id="loginLoading">Signing in...</div>
+    <div class="login-error" id="loginError"></div>
+  </div>
+</div>
 
 <!-- ── Sidebar ── -->
 <nav class="sidebar">
@@ -833,7 +865,7 @@
   <div class="manage-view" id="view-users" style="padding:24px 32px; overflow-y:auto; max-height:calc(100vh - 65px);">
     <div class="manage-header">
       <h2>Users</h2>
-      <a class="btn accent" href="https://airtable.com/app27jUbqonTIiHXY/tblyZezYKlxEOW9M5" target="_blank">✎ Edit in Airtable</a>
+      <span style="font-size:12px;color:var(--text-dim)">Microsoft SSO · @firstmilecap.com</span>
     </div>
     <div class="data-table">
       <div class="loading-spinner" id="users-loading">
@@ -845,9 +877,10 @@
           <tr>
             <th style="text-align:left">Name</th>
             <th style="text-align:left">Email</th>
-            <th>Role</th>
-            <th>Phone</th>
-            <th>Status</th>
+            <th style="text-align:center">Admin</th>
+            <th style="text-align:center">First Login</th>
+            <th style="text-align:center">Last Login</th>
+            <th style="text-align:center">Access</th>
           </tr>
         </thead>
         <tbody id="users-tbody"></tbody>
@@ -862,21 +895,19 @@
     <!-- Property Tabs + Detail View (active state) -->
     <div id="fbDetail" class="fb-detail" style="display:none">
       <div class="fb-tabs" id="fbTabs"></div>
-      <div class="fb-year-bar" id="fbYearBar"></div>
-      <div class="fb-detail-header-row">
-        <div class="fb-detail-header" id="fbDetailHeader"></div>
-        <div class="fb-chart-card" id="fbChartCard">
-          <div class="fb-chart-card-title">
-            <span>Revenue / Expenses / NOI</span>
-            <div class="fb-chart-legend">
-              <span><span class="dot" style="background:var(--green)"></span>Revenue</span>
-              <span><span class="dot" style="background:#e05a4d"></span>Expenses</span>
-              <span><span class="dot" style="background:var(--accent)"></span>NOI</span>
-            </div>
+      <div class="fb-chart-card" id="fbChartCard" style="margin-bottom:12px;">
+        <div class="fb-chart-card-title">
+          <span>Revenue / Expenses / NOI</span>
+          <div class="fb-chart-legend">
+            <span><span class="dot" style="background:var(--green)"></span>Revenue</span>
+            <span><span class="dot" style="background:#e05a4d"></span>Expenses</span>
+            <span><span class="dot" style="background:var(--accent)"></span>NOI</span>
           </div>
-          <div class="fb-chart-body" id="fbChartBody"></div>
         </div>
+        <div class="fb-chart-body" id="fbChartBody"></div>
       </div>
+      <div class="fb-year-bar" id="fbYearBar"></div>
+      <div id="fbDetailHeader" style="display:none"></div>
       <div class="fb-detail-nav">
         <button class="fb-nav-btn active" onclick="fbShowTab('summary')">Summary</button>
         <button class="fb-nav-btn" onclick="fbShowTab('revenue')">Revenue</button>
@@ -1024,8 +1055,210 @@
   </div>
 </div>
 
+<script src="https://unpkg.com/@azure/msal-browser@2.38.0/lib/msal-browser.min.js"></script>
 <script src="config.js" onerror="/* deployed: secrets injected by CI */"></script>
 <script>
+  // ══════════════════════════════════════
+  // ── MICROSOFT SSO AUTHENTICATION ──
+  // ══════════════════════════════════════
+  const MSAL_CLIENT_ID = window.MSAL_CLIENT_ID || '__MSAL_CLIENT_ID__';
+  const MSAL_TENANT_ID = window.MSAL_TENANT_ID || '__MSAL_TENANT_ID__';
+  const ALLOWED_DOMAIN = 'firstmilecap.com';
+
+  let msalInstance = null;
+  let currentUser = null; // { email, name, initials }
+
+  function msalInit() {
+    if (MSAL_CLIENT_ID.includes('__MSAL_CLIENT_ID__')) {
+      console.warn('MSAL not configured — skipping auth');
+      authBypass();
+      return;
+    }
+    const msalConfig = {
+      auth: {
+        clientId: MSAL_CLIENT_ID,
+        authority: `https://login.microsoftonline.com/${MSAL_TENANT_ID}`,
+        redirectUri: window.location.origin,
+        postLogoutRedirectUri: window.location.origin,
+      },
+      cache: {
+        cacheLocation: 'sessionStorage',
+        storeAuthStateInCookie: false,
+      }
+    };
+    msalInstance = new msal.PublicClientApplication(msalConfig);
+    // Check for existing session
+    const accounts = msalInstance.getAllAccounts();
+    if (accounts.length > 0) {
+      handleAuthResult(accounts[0]);
+    }
+  }
+
+  async function msalLogin() {
+    const btn = document.getElementById('loginBtn');
+    const loading = document.getElementById('loginLoading');
+    const error = document.getElementById('loginError');
+    error.style.display = 'none';
+
+    if (!msalInstance) {
+      // Dev mode — no MSAL configured
+      authBypass();
+      return;
+    }
+
+    btn.style.display = 'none';
+    loading.style.display = 'block';
+
+    try {
+      const result = await msalInstance.loginPopup({
+        scopes: ['User.Read'],
+        prompt: 'select_account',
+      });
+      await handleAuthResult(result.account);
+    } catch (e) {
+      console.error('Login error:', e);
+      btn.style.display = '';
+      loading.style.display = 'none';
+      error.style.display = 'block';
+      if (e.errorCode === 'user_cancelled') {
+        error.textContent = 'Login cancelled.';
+      } else {
+        error.textContent = 'Login failed: ' + (e.message || 'Unknown error');
+      }
+    }
+  }
+
+  async function handleAuthResult(account) {
+    const email = (account.username || '').toLowerCase();
+    const domain = email.split('@')[1];
+    const error = document.getElementById('loginError');
+
+    // Domain check
+    if (domain !== ALLOWED_DOMAIN) {
+      error.textContent = `Access denied. Only @${ALLOWED_DOMAIN} accounts can sign in.`;
+      error.style.display = 'block';
+      document.getElementById('loginBtn').style.display = '';
+      document.getElementById('loginLoading').style.display = 'none';
+      if (msalInstance) msalInstance.logout({ account });
+      return;
+    }
+
+    // Check if user is blocked in Supabase
+    const userRecord = await checkUserAccess(email, account.name || email.split('@')[0]);
+    if (userRecord && userRecord.is_blocked) {
+      error.textContent = 'Your account has been blocked. Contact an administrator.';
+      error.style.display = 'block';
+      document.getElementById('loginBtn').style.display = '';
+      document.getElementById('loginLoading').style.display = 'none';
+      if (msalInstance) msalInstance.logout({ account });
+      return;
+    }
+
+    // Set current user
+    const name = account.name || email.split('@')[0];
+    const parts = name.split(' ');
+    const initials = parts.length >= 2
+      ? (parts[0][0] + parts[parts.length-1][0]).toUpperCase()
+      : name.slice(0, 2).toUpperCase();
+
+    currentUser = {
+      email,
+      name,
+      initials,
+      isAdmin: userRecord ? userRecord.is_admin : false,
+    };
+
+    // Update UI with user info
+    updateUserUI();
+
+    // Hide login overlay
+    document.getElementById('loginOverlay').classList.add('hidden');
+    setTimeout(() => { document.getElementById('loginOverlay').style.display = 'none'; }, 400);
+  }
+
+  async function checkUserAccess(email, displayName) {
+    try {
+      // Try to find user in app_users
+      const users = await supaFetch('app_users', `?email=eq.${encodeURIComponent(email)}`);
+      if (users.length > 0) {
+        // Update last_login
+        await fetch(`${SUPABASE_URL}/rest/v1/app_users?email=eq.${encodeURIComponent(email)}`, {
+          method: 'PATCH',
+          headers: {
+            'apikey': SUPABASE_KEY,
+            'Authorization': `Bearer ${SUPABASE_KEY}`,
+            'Content-Type': 'application/json',
+            'Prefer': 'return=minimal',
+          },
+          body: JSON.stringify({ last_login: new Date().toISOString() })
+        });
+        return users[0];
+      }
+      // New user — create record with first_login
+      const newUser = await fetch(`${SUPABASE_URL}/rest/v1/app_users`, {
+        method: 'POST',
+        headers: {
+          'apikey': SUPABASE_KEY,
+          'Authorization': `Bearer ${SUPABASE_KEY}`,
+          'Content-Type': 'application/json',
+          'Prefer': 'return=representation',
+        },
+        body: JSON.stringify({
+          email,
+          display_name: displayName,
+          first_login: new Date().toISOString(),
+          last_login: new Date().toISOString(),
+          is_blocked: false,
+          is_admin: false,
+        })
+      });
+      if (newUser.ok) {
+        const arr = await newUser.json();
+        return arr[0] || { is_blocked: false, is_admin: false };
+      }
+      return { is_blocked: false, is_admin: false };
+    } catch (e) {
+      console.warn('User access check failed:', e);
+      return { is_blocked: false, is_admin: false };
+    }
+  }
+
+  function updateUserUI() {
+    if (!currentUser) return;
+    // Update topbar user pill
+    const pill = document.querySelector('.user-pill');
+    if (pill) {
+      pill.innerHTML = `
+        <div class="user-avatar">${currentUser.initials}</div>
+        ${currentUser.name.split(' ')[0]}
+        <svg onclick="msalLogout()" style="cursor:pointer;margin-left:6px;opacity:.5" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>`;
+    }
+    // Update home greeting
+    const greeting = document.querySelector('.home-greeting h2');
+    if (greeting) greeting.textContent = `Welcome back, ${currentUser.name.split(' ')[0]}`;
+  }
+
+  function msalLogout() {
+    currentUser = null;
+    sessionStorage.clear();
+    if (msalInstance) {
+      msalInstance.logoutPopup().then(() => { window.location.reload(); }).catch(() => { window.location.reload(); });
+    } else {
+      window.location.reload();
+    }
+  }
+
+  // Dev bypass when MSAL not configured
+  function authBypass() {
+    currentUser = { email: 'mz@firstmilecap.com', name: 'Morris Zeitouni', initials: 'MZ', isAdmin: true };
+    updateUserUI();
+    document.getElementById('loginOverlay').classList.add('hidden');
+    setTimeout(() => { document.getElementById('loginOverlay').style.display = 'none'; }, 400);
+  }
+
+  // Initialize auth on page load
+  document.addEventListener('DOMContentLoaded', msalInit);
+
   // ── View Switching ──
   const VIEW_TITLES = {
     home: '',
@@ -1176,21 +1409,17 @@
   let usersLoaded = false;
 
   async function loadUsers() {
-    if (usersLoaded) return;
-    usersLoaded = true;
+    usersLoaded = false; // always refresh
     try {
-      const r = await fetch(`https://api.airtable.com/v0/${AT_BASE}/tblyZezYKlxEOW9M5?pageSize=100`, {
-        headers: { 'Authorization': `Bearer ${AT_TOKEN}` }
-      });
-      if (!r.ok) throw new Error(`HTTP ${r.status}`);
-      const data = await r.json();
-      usersData = data.records.map(rec => ({
-        id: rec.id,
-        name: rec.fields['Full Name'] || '',
-        email: rec.fields['Email'] || '',
-        role: rec.fields['Role']?.name || rec.fields['Role'] || '',
-        phone: rec.fields['Phone'] || '',
-        status: rec.fields['Status']?.name || rec.fields['Status'] || '',
+      const users = await supaFetch('app_users', '?order=display_name');
+      usersData = users.map(u => ({
+        id: u.id,
+        name: u.display_name || u.email.split('@')[0],
+        email: u.email,
+        isAdmin: u.is_admin || false,
+        isBlocked: u.is_blocked || false,
+        firstLogin: u.first_login,
+        lastLogin: u.last_login,
       }));
       renderUsers();
     } catch (e) {
@@ -1203,20 +1432,68 @@
     document.getElementById('users-loading').style.display = 'none';
     document.getElementById('users-table').style.display = 'table';
     const tbody = document.getElementById('users-tbody');
+    const isAdmin = currentUser && currentUser.isAdmin;
     if (!usersData.length) {
-      tbody.innerHTML = '<tr><td colspan="5" style="text-align:center;color:var(--text-dim);padding:32px;">No users found.</td></tr>';
+      tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;color:var(--text-dim);padding:32px;">No users have signed in yet.</td></tr>';
       return;
     }
+    const fmtDate = (d) => {
+      if (!d) return '—';
+      const dt = new Date(d);
+      return dt.toLocaleDateString('en-US', { month:'short', day:'numeric', year:'numeric' });
+    };
+    const fmtTime = (d) => {
+      if (!d) return '—';
+      const dt = new Date(d);
+      const date = dt.toLocaleDateString('en-US', { month:'short', day:'numeric' });
+      const time = dt.toLocaleTimeString('en-US', { hour:'numeric', minute:'2-digit' });
+      return `${date}, ${time}`;
+    };
     tbody.innerHTML = usersData.sort((a,b) => a.name.localeCompare(b.name)).map(u => {
-      const statusColor = u.status === 'Active' ? 'var(--green)' : 'var(--text-dim)';
+      const isSelf = currentUser && currentUser.email === u.email;
+      const statusColor = u.isBlocked ? '#e5534b' : 'var(--green)';
+      const statusLabel = u.isBlocked ? 'Blocked' : 'Active';
+      const adminBadge = u.isAdmin ? '<span style="background:var(--accent);color:#fff;padding:2px 8px;border-radius:4px;font-size:10px;font-weight:700">Admin</span>' : '—';
+      let actionBtn = '';
+      if (isAdmin && !isSelf) {
+        if (u.isBlocked) {
+          actionBtn = `<button onclick="toggleUserAccess(${u.id}, false)" style="background:var(--green);color:#fff;border:none;border-radius:6px;padding:5px 12px;font-size:11px;font-weight:600;cursor:pointer">Unblock</button>`;
+        } else {
+          actionBtn = `<button onclick="toggleUserAccess(${u.id}, true)" style="background:#e5534b;color:#fff;border:none;border-radius:6px;padding:5px 12px;font-size:11px;font-weight:600;cursor:pointer">Block</button>`;
+        }
+      } else if (isSelf) {
+        actionBtn = `<span style="color:var(--text-dim);font-size:11px">You</span>`;
+      }
       return `<tr>
         <td style="text-align:left;font-weight:600">${u.name}</td>
         <td style="text-align:left"><a href="mailto:${u.email}" style="color:var(--accent);text-decoration:none">${u.email}</a></td>
-        <td style="text-align:center">${u.role}</td>
-        <td style="text-align:center">${u.phone || '—'}</td>
-        <td style="text-align:center"><span style="color:${statusColor};font-weight:600;font-size:11px">${u.status || '—'}</span></td>
+        <td style="text-align:center">${adminBadge}</td>
+        <td style="text-align:center;font-size:11px;color:var(--text-dim)">${fmtDate(u.firstLogin)}</td>
+        <td style="text-align:center;font-size:11px;color:var(--text-dim)">${fmtTime(u.lastLogin)}</td>
+        <td style="text-align:center">${actionBtn || `<span style="color:${statusColor};font-weight:600;font-size:11px">${statusLabel}</span>`}</td>
       </tr>`;
     }).join('');
+  }
+
+  async function toggleUserAccess(userId, block) {
+    try {
+      await fetch(`${SUPABASE_URL}/rest/v1/app_users?id=eq.${userId}`, {
+        method: 'PATCH',
+        headers: {
+          'apikey': SUPABASE_KEY,
+          'Authorization': `Bearer ${SUPABASE_KEY}`,
+          'Content-Type': 'application/json',
+          'Prefer': 'return=minimal',
+        },
+        body: JSON.stringify({ is_blocked: block })
+      });
+      // Refresh
+      usersLoaded = false;
+      await loadUsers();
+    } catch (e) {
+      console.error('Toggle user access error:', e);
+      alert('Failed to update user access: ' + e.message);
+    }
   }
 
   // ══════════════════════════════════════
@@ -1746,7 +2023,7 @@ Budget data is available via get_budget_summary for: 61 S Paramus (281,504 SF), 
   // ── Property Financials & Budgeting Module ──
   let bgtData = null, bgtLoaded = false;
   let fbSelectedIdx = -1, fbActiveTab = 'summary', fbMode = 'nominal';
-  let fbSelectedYear = 2027;
+  let fbSelectedYear = 2026;
   const FB_YEARS = [
     { year: 2025, status: 'historical', label: 'Historical' },
     { year: 2026, status: 'active', label: 'Active' },
@@ -1826,7 +2103,9 @@ Budget data is available via get_budget_summary for: 61 S Paramus (281,504 SF), 
     const byGl = {};
     rows.forEach(r => {
       if (!byGl[r.gl_code]) byGl[r.gl_code] = { name: r.account_name, months: {} };
-      byGl[r.gl_code].months[MONTHS[r.month - 1]] = r.amount;
+      const monthKey = MONTHS[r.month - 1];
+      // Accumulate (don't overwrite) — handles multiple old GL codes mapped to same new GL
+      byGl[r.gl_code].months[monthKey] = (byGl[r.gl_code].months[monthKey] || 0) + r.amount;
     });
 
     const detailRows = [];
@@ -1897,6 +2176,74 @@ Budget data is available via get_budget_summary for: 61 S Paramus (281,504 SF), 
       }
     });
 
+    // Reorder below-NOI sections: G&A → Debt → Net Cash After Debt → Capital (Base Bldg, TI, Brokerage) → Depreciation
+    const noiIdx = summaryRows.findIndex(r => r.label === 'NET OPERATING INCOME');
+    if (noiIdx >= 0) {
+      const aboveNoi = summaryRows.slice(0, noiIdx + 1);
+      const belowNoi = summaryRows.slice(noiIdx + 1);
+
+      // Bucket below-NOI rows by section
+      const sections = { ga: [], debt: [], capital: [], depreciation: [], other: [] };
+      let currentBucket = 'other';
+      belowNoi.forEach(row => {
+        const lbl = (row.label || '').toUpperCase();
+        if (row.isHeader) {
+          if (lbl.includes('NON-RECOVERABLE') || lbl.includes('G&A')) currentBucket = 'ga';
+          else if (lbl.includes('DEBT')) currentBucket = 'debt';
+          else if (lbl.includes('CAPITAL')) currentBucket = 'capital';
+          else if (lbl.includes('DEPRECIATION') || lbl.includes('AMORTIZATION')) currentBucket = 'depreciation';
+          else currentBucket = 'other';
+        }
+        sections[currentBucket].push(row);
+      });
+
+      // Reorder capital items: Base Bldg Costs, Owner Capital Reserve, Tenant Improvements, Brokerage Commissions
+      const capitalHeader = sections.capital.filter(r => r.isHeader);
+      const capitalTotal = sections.capital.filter(r => r.isTotal);
+      const capitalItems = sections.capital.filter(r => !r.isHeader && !r.isTotal);
+      const capOrder = ['base bldg', 'owner capital', 'tenant improve', 'brokerage'];
+      capitalItems.sort((a, b) => {
+        const aLbl = (a.label || '').toLowerCase();
+        const bLbl = (b.label || '').toLowerCase();
+        const aIdx = capOrder.findIndex(k => aLbl.includes(k));
+        const bIdx = capOrder.findIndex(k => bLbl.includes(k));
+        return (aIdx === -1 ? 99 : aIdx) - (bIdx === -1 ? 99 : bIdx);
+      });
+      sections.capital = [...capitalHeader, ...capitalItems, ...capitalTotal];
+
+      // Compute NET CASH AFTER DEBT SERVICE = NOI - G&A total - Debt total
+      const gaTotalRow = sections.ga.find(r => r.isTotal);
+      const debtTotalRow = sections.debt.find(r => r.isTotal);
+      const noiRowVal = aboveNoi.find(r => r.label === 'NET OPERATING INCOME');
+      const noiAnnual = noiRowVal && noiRowVal.months ? MONTHS.reduce((s, m) => s + (noiRowVal.months[m] || 0), 0) : (noiRowVal ? noiRowVal.budget26 : 0);
+      const gaAnnual = gaTotalRow && gaTotalRow.months ? MONTHS.reduce((s, m) => s + (gaTotalRow.months[m] || 0), 0) : (gaTotalRow ? gaTotalRow.budget26 : 0);
+      const debtAnnual = debtTotalRow && debtTotalRow.months ? MONTHS.reduce((s, m) => s + (debtTotalRow.months[m] || 0), 0) : (debtTotalRow ? debtTotalRow.budget26 : 0);
+      const netCashMonths = {};
+      MONTHS.forEach(m => {
+        const noiM = noiRowVal && noiRowVal.months ? (noiRowVal.months[m] || 0) : 0;
+        const gaM = gaTotalRow && gaTotalRow.months ? (gaTotalRow.months[m] || 0) : 0;
+        const debtM = debtTotalRow && debtTotalRow.months ? (debtTotalRow.months[m] || 0) : 0;
+        netCashMonths[m] = noiM - Math.abs(gaM) - Math.abs(debtM);
+      });
+      const netCashAnnual = MONTHS.reduce((s, m) => s + netCashMonths[m], 0);
+      const netCashRow = { label: 'NET CASH AFTER DEBT SERVICE', isHeader: false, isTotal: true, budget26: netCashAnnual, months: netCashMonths, _isNetCash: true };
+
+      // Compute NET CASH AVAILABLE FOR DISTRIBUTION = Net Cash After Debt - Capital Expenses
+      const capTotalRow = sections.capital.find(r => r.isTotal);
+      const distMonths = {};
+      MONTHS.forEach(m => {
+        const ncM = netCashMonths[m] || 0;
+        const capM = capTotalRow && capTotalRow.months ? (capTotalRow.months[m] || 0) : 0;
+        distMonths[m] = ncM - Math.abs(capM);
+      });
+      const distAnnual = MONTHS.reduce((s, m) => s + distMonths[m], 0);
+      const distRow = { label: 'NET CASH AVAILABLE FOR DISTRIBUTION', isHeader: false, isTotal: true, budget26: distAnnual, months: distMonths };
+
+      // Reassemble: above NOI + G&A + Debt + Net Cash After Debt + Capital + Net Cash for Distribution + Depreciation + other
+      summaryRows.length = 0;
+      summaryRows.push(...aboveNoi, ...sections.ga, ...sections.debt, netCashRow, ...sections.capital, distRow, ...sections.depreciation, ...sections.other);
+    }
+
     const totalIncomeRow = summaryRows.find(r => r.label === 'TOTAL INCOME');
     const noiRow = summaryRows.find(r => r.label === 'NET OPERATING INCOME');
     const totalExpRow = summaryRows.find(r => r.label === 'TOTAL OPERATING EXPENSES' || r.label === 'TOTAL BUILDING EXPENSES');
@@ -1918,16 +2265,50 @@ Budget data is available via get_budget_summary for: 61 S Paramus (281,504 SF), 
         const glLookup = {};
         gl.forEach(g => { glLookup[g.code] = g; });
 
-        // Fetch ALL budget rows (both 2025 and 2026) with pagination
-        let allRows = [];
+        // Load GL code mapping (old → new) for remapping actuals data
+        let glOldToNew = {};
+        try {
+          const mapResp = await fetch('data/gl-old-to-new.json');
+          glOldToNew = await mapResp.json();
+          console.log('GL mapping loaded:', Object.keys(glOldToNew).length, 'entries');
+        } catch(e) { console.warn('GL mapping not loaded, using identity mapping:', e); }
+
+        // Fetch budget rows from budget_line_items with pagination
+        let budgetRows = [];
         let offset = 0;
         const pageSize = 1000;
         while (true) {
           const page = await supaFetch('budget_line_items', `?order=property_id,year,gl_code,month&limit=${pageSize}&offset=${offset}`);
-          allRows = allRows.concat(page);
+          budgetRows = budgetRows.concat(page);
           if (page.length < pageSize) break;
           offset += pageSize;
         }
+        console.log('Budget rows loaded:', budgetRows.length);
+
+        // Fetch actuals rows from actuals_line_items with pagination
+        let actualsRows = [];
+        offset = 0;
+        while (true) {
+          const page = await supaFetch('actuals_line_items', `?order=property_id,year,gl_code,month&limit=${pageSize}&offset=${offset}`);
+          actualsRows = actualsRows.concat(page);
+          if (page.length < pageSize) break;
+          offset += pageSize;
+        }
+        console.log('Actuals rows loaded:', actualsRows.length);
+
+        // Remap actuals GL codes: old COA → new COA using gl_code_mapping
+        actualsRows.forEach(row => {
+          const newGl = glOldToNew[row.gl_code];
+          if (newGl && newGl !== row.gl_code) {
+            // Look up the new GL's account name from the GL accounts list
+            const newGlInfo = glLookup[newGl];
+            row.gl_code = newGl;
+            if (newGlInfo) row.account_name = newGlInfo.name;
+          }
+        });
+
+        // Combine both sources
+        const allRows = [...budgetRows, ...actualsRows];
         console.log('Total rows loaded:', allRows.length);
 
         // Group by property → year
@@ -2014,13 +2395,15 @@ Budget data is available via get_budget_summary for: 61 S Paramus (281,504 SF), 
     grid.innerHTML = bgtData.map((p, i) => {
       const photo = FB_PHOTOS[p.name] || '';
       const imgStyle = photo ? `background-image:url('${photo}')` : `background:linear-gradient(135deg,var(--navy),var(--accent))`;
+      const noiPsf = p.sqft && p.noi ? (p.noi / p.sqft).toFixed(2) : '—';
+      const expRatio = p.totalIncome ? ((p.totalExpenses / p.totalIncome) * 100).toFixed(1) + '%' : '—';
       return `<div class="fb-card" onclick="fbSelectProp(${i})">
         <div class="fb-card-img" style="${imgStyle}">
           <div class="fb-card-name">${p.name}</div>
         </div>
         <div class="fb-card-body">
           <div class="fb-card-meta">${p.sqft ? p.sqft.toLocaleString() + ' SF' : ''} · ${p.budgetYear} Budget</div>
-          <div class="fb-card-metrics">
+          <div class="fb-card-metrics" style="grid-template-columns:1fr 1fr 1fr;">
             <div class="fb-card-metric">
               <div class="fb-card-metric-label">Revenue</div>
               <div class="fb-card-metric-val revenue">${fbFmt(p.totalIncome)}</div>
@@ -2032,6 +2415,20 @@ Budget data is available via get_budget_summary for: 61 S Paramus (281,504 SF), 
             <div class="fb-card-metric">
               <div class="fb-card-metric-label">NOI</div>
               <div class="fb-card-metric-val noi">${fbFmt(p.noi)}</div>
+            </div>
+          </div>
+          <div class="fb-card-metrics" style="grid-template-columns:1fr 1fr 1fr; margin-top:8px; padding-top:8px; border-top:1px solid var(--border);">
+            <div class="fb-card-metric">
+              <div class="fb-card-metric-label">SF</div>
+              <div class="fb-card-metric-val" style="font-size:14px;">${p.sqft ? p.sqft.toLocaleString() : '—'}</div>
+            </div>
+            <div class="fb-card-metric">
+              <div class="fb-card-metric-label">NOI / SF</div>
+              <div class="fb-card-metric-val noi" style="font-size:14px;">$${noiPsf}</div>
+            </div>
+            <div class="fb-card-metric">
+              <div class="fb-card-metric-label">Exp Ratio</div>
+              <div class="fb-card-metric-val" style="font-size:14px; color:var(--text-dim);">${expRatio}</div>
             </div>
           </div>
         </div>
@@ -2165,8 +2562,8 @@ Budget data is available via get_budget_summary for: 61 S Paramus (281,504 SF), 
 
     const rect = container.getBoundingClientRect();
     const W = Math.max(rect.width || 400, 300);
-    const H = Math.max(rect.height || 130, 110);
-    const pad = { top: 18, right: 16, bottom: 28, left: 65 };
+    const H = Math.max(rect.height || 200, 180);
+    const pad = { top: 22, right: 16, bottom: 28, left: 65 };
     const plotW = W - pad.left - pad.right;
     const plotH = H - pad.top - pad.bottom;
 
@@ -2193,7 +2590,8 @@ Budget data is available via get_budget_summary for: 61 S Paramus (281,504 SF), 
       const gy = pad.top + (plotH / 2) * i;
       const gv = maxV - (range / 2) * i;
       svg += `<line x1="${pad.left}" y1="${gy}" x2="${W - pad.right}" y2="${gy}" stroke="var(--border)" stroke-width="1" stroke-dasharray="4,3"/>`;
-      svg += `<text x="${pad.left - 8}" y="${gy + 3}" text-anchor="end" font-size="9" fill="var(--text-dim)">$${(gv / 1000).toFixed(0)}k</text>`;
+      const gvLabel = Math.abs(gv) >= 1000000 ? '$' + (gv / 1000000).toFixed(1) + 'M' : '$' + (gv / 1000).toFixed(0) + 'k';
+      svg += `<text x="${pad.left - 8}" y="${gy + 3}" text-anchor="end" font-size="9" fill="var(--text-dim)">${gvLabel}</text>`;
     }
 
     // X-axis labels
@@ -2210,7 +2608,9 @@ Budget data is available via get_budget_summary for: 61 S Paramus (281,504 SF), 
       yearData.forEach((d, i) => {
         svg += `<circle cx="${x(i)}" cy="${y(d[line.key])}" r="4" fill="${line.color}" stroke="#fff" stroke-width="2"/>`;
         // Value label on dot
-        svg += `<text x="${x(i)}" y="${y(d[line.key]) - 8}" text-anchor="middle" font-size="9" font-weight="600" fill="${line.color}">$${(d[line.key] / 1000).toFixed(0)}k</text>`;
+        const dotVal = d[line.key];
+        const dotLabel = Math.abs(dotVal) >= 1000000 ? '$' + (dotVal / 1000000).toFixed(2) + 'M' : '$' + (dotVal / 1000).toFixed(0) + 'k';
+        svg += `<text x="${x(i)}" y="${y(d[line.key]) - 8}" text-anchor="middle" font-size="9" font-weight="600" fill="${line.color}">${dotLabel}</text>`;
       });
     });
 
@@ -2379,13 +2779,17 @@ Budget data is available via get_budget_summary for: 61 S Paramus (281,504 SF), 
 
     // Pre-build: merge sub-section headers with their total rows
     const allRows = p.summaryRows || p.rows || [];
-    const topLevelPattern = /^(INCOME|REVENUE|OPERATING|EXPENSE|NET OPERATING|NOI|BELOW|CAPITAL|DEBT|G&A|GENERAL)/i;
+    const topLevelPattern = /^(INCOME|REVENUE|OPERATING|EXPENSE|NET OPERATING|NOI|BELOW|GENERAL)/i;
     const headerLabels = new Set(allRows.filter(r => r.isHeader && !topLevelPattern.test(r.label)).map(r => r.label.toUpperCase()));
     const totalByHeader = {};
     allRows.forEach(row => {
       if (!row.isTotal) return;
       const stripped = row.label.replace(/^TOTAL\s+/i, '').toUpperCase();
-      if (headerLabels.has(stripped)) totalByHeader[stripped] = row;
+      if (headerLabels.has(stripped)) { totalByHeader[stripped] = row; return; }
+      // Fuzzy match: check if any header is a prefix of the stripped total (e.g. "DEPRECIATION & AMORTIZATION" matches "DEPRECIATION & AMORTIZATION EXPENSE")
+      for (const hl of headerLabels) {
+        if (stripped.startsWith(hl) && stripped.length - hl.length < 15) { totalByHeader[hl] = row; break; }
+      }
     });
 
     // Helper: render the 7 value cells (A, B, C, varAB$, varAB%, varAC$, varAC%) for a row
@@ -2430,12 +2834,16 @@ Budget data is available via get_budget_summary for: 61 S Paramus (281,504 SF), 
       if (row.isHeader) {
         sectionIdx++;
         const label = row.label;
-        if (label.includes('EXPENSE') || label.includes('OPERATING')) isExpenseSection = true;
-        if (label === 'INCOME') isExpenseSection = false;
+        const upperLabel = label.toUpperCase();
+        // Only top-level headers flip expense mode
+        const isTopLevel = topLevelPattern.test(label);
+        if (isTopLevel && (upperLabel.includes('EXPENSE') || upperLabel.includes('OPERATING'))) isExpenseSection = true;
+        if (upperLabel === 'INCOME') isExpenseSection = false;
         let sectionCls = 'bgt-section-other';
-        if (label === 'INCOME' || label.includes('REVENUE')) sectionCls = 'bgt-section-income';
-        else if (label.includes('EXPENSE') || label.includes('OPERATING')) sectionCls = 'bgt-section-expense';
-        else if (label.includes('NOI') || label.includes('NET OPERATING')) sectionCls = 'bgt-section-noi';
+        if (upperLabel === 'INCOME' || upperLabel.includes('REVENUE')) sectionCls = 'bgt-section-income';
+        else if (isTopLevel && (upperLabel.includes('EXPENSE') || upperLabel.includes('OPERATING'))) sectionCls = 'bgt-section-expense';
+        else if (upperLabel.includes('CAPITAL EXPENSE')) sectionCls = 'bgt-section-expense';
+        else if (upperLabel.includes('NOI') || upperLabel.includes('NET OPERATING')) sectionCls = 'bgt-section-noi';
 
         const matchTotal = totalByHeader[label.toUpperCase()];
         if (matchTotal) {
@@ -2453,12 +2861,20 @@ Budget data is available via get_budget_summary for: 61 S Paramus (281,504 SF), 
       if (row.isTotal) {
         const stripped = row.label.replace(/^TOTAL\s+/i, '').toUpperCase();
         if (totalByHeader[stripped] === row) return;
+        // Skip orphan sub-section totals whose header doesn't exist in current view
+        // (e.g. TOTAL ADMINISTRATIVE EXPENSES - RECOVERABLE when no admin items exist for this property)
+        if (!topLevelPattern.test(stripped) && !headerLabels.has(stripped)) {
+          // Check it's not a major aggregate total (TOTAL INCOME, TOTAL OPERATING EXPENSES, NOI, etc.)
+          const lbl = row.label.toLowerCase();
+          const isMajorTotal = lbl === 'total income' || lbl === 'total revenue' || lbl.includes('total operating expenses') || lbl.includes('net operating income') || lbl.includes('net income') || lbl.includes('net cash');
+          if (!isMajorTotal) return;
+        }
       }
 
       let totalCls = '';
       if (row.isTotal) {
         const lbl = row.label.toLowerCase();
-        if (lbl.includes('net operating income') || lbl.includes('net income')) totalCls = 'bgt-row-total bgt-total-noi';
+        if (lbl.includes('net cash') || lbl.includes('net operating income') || lbl.includes('net income')) totalCls = 'bgt-row-total bgt-total-noi';
         else if (lbl === 'total income' || lbl === 'total revenue') totalCls = 'bgt-row-total bgt-total-income';
         else if (lbl.includes('expenses') || lbl.includes('total operating')) totalCls = 'bgt-row-total bgt-total-expense';
         else totalCls = 'bgt-row-total';
@@ -2594,9 +3010,16 @@ Budget data is available via get_budget_summary for: 61 S Paramus (281,504 SF), 
         Click any value to edit · autosaved on change · click category headers to collapse
       </div>`;
     }
-    html += `<div style="overflow-x:auto;border-radius:10px;border:1px solid var(--border)"><table class="fb-monthly-table"><thead><tr>
-      <th>Line Item</th>`;
-    if (showGL) html += `<th style="text-align:center;min-width:50px">GL</th>`;
+    // Build colgroup for fixed-layout columns
+    const totalDataCols = months.length + 1; // 12 months + total
+    const glColWidth = showGL ? 44 : 0;
+    html += `<div style="overflow-x:auto;border-radius:10px;border:1px solid var(--border)"><table class="fb-monthly-table">`;
+    html += `<colgroup><col style="width:180px">`;
+    if (showGL) html += `<col style="width:44px">`;
+    months.forEach(() => { html += `<col>`; }); // auto-distribute remaining
+    html += `<col></colgroup>`; // total col
+    html += `<thead><tr><th>Line Item</th>`;
+    if (showGL) html += `<th style="text-align:center">GL</th>`;
     months.forEach(m => { html += `<th>${m}</th>`; });
     html += `<th style="font-weight:700;color:var(--accent)">Total</th></tr></thead><tbody>`;
 
