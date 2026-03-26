@@ -1641,10 +1641,10 @@ function renderBalanceSheet() {
       // Manual valuation explicitly entered
       value = r.valuation;
     } else {
-      // No valuation set — show 0, don't fall back to contributed/net_equity which inflates total
-      value = 0;
-      valueSource = 'none';
+      value = r.netEquity || 0;
+      valueSource = 'equity';
     }
+    console.log(`[BS] ${r.name}: value=${value}, source=${valueSource}, valuation=${r.valuation}, netEquity=${r.netEquity}, contributed=${r.contributed}, ownership=${ownershipPct}, propertyId=${r.propertyId}, capRate=${r.capRate}, NOI=${r.propertyNOI}, debt=${r.propertyDebt}`);
     investmentsTotal += value;
     return { id: r.id, name: r.name || 'Unknown', ownership: r.ownership || 0, committed: r.committed || 0, contributed: r.contributed || 0, distributed: r.distributed || 0, unreturned: r.unreturned || 0, valuation: r.valuation, netEquity: r.netEquity || 0, status: r.status, value, valueSource, valuationDetails, propertyId: r.propertyId, propertyName: r.propertyName, propertyValuation: r.propertyValuation, capRate: r.capRate, propertyNOI: r.propertyNOI, propertyDebt: r.propertyDebt };
   });
