@@ -658,25 +658,27 @@
   </div>
 
   <!-- Properties View -->
-  <div class="manage-view" id="view-properties">
+  <div class="manage-view" id="view-properties" style="padding:24px 32px; overflow-y:auto; max-height:calc(100vh - 65px);">
     <div class="manage-header">
       <h2>Properties</h2>
-      <button class="btn accent" onclick="alert('Add property form coming soon')">+ Add Property</button>
+      <a class="btn accent" href="https://airtable.com/app27jUbqonTIiHXY/tbl63t0DN1HNhImZ6" target="_blank">✎ Edit in Airtable</a>
     </div>
     <div class="data-table">
       <div class="loading-spinner" id="properties-loading">
         <div class="spinner"></div>
-        Loading properties from Airtable…
+        Loading properties…
       </div>
-      <table id="properties-table" style="display:none">
+      <table id="properties-table" style="display:none" class="bgt-table">
         <thead>
           <tr>
-            <th>Property Name</th>
-            <th>Type</th>
-            <th>Address</th>
-            <th>Units</th>
-            <th>Entity</th>
+            <th style="text-align:left">Property Name</th>
+            <th style="text-align:left">Address</th>
+            <th style="text-align:left">City</th>
+            <th>State</th>
+            <th>Sq Ft</th>
+            <th style="text-align:left">Entity</th>
             <th>Status</th>
+            <th></th>
           </tr>
         </thead>
         <tbody id="properties-tbody"></tbody>
@@ -685,23 +687,23 @@
   </div>
 
   <!-- Users View -->
-  <div class="manage-view" id="view-users">
+  <div class="manage-view" id="view-users" style="padding:24px 32px; overflow-y:auto; max-height:calc(100vh - 65px);">
     <div class="manage-header">
       <h2>Users</h2>
-      <button class="btn accent" onclick="alert('Add user form coming soon')">+ Add User</button>
+      <a class="btn accent" href="https://airtable.com/app27jUbqonTIiHXY/tblyZezYKlxEOW9M5" target="_blank">✎ Edit in Airtable</a>
     </div>
     <div class="data-table">
       <div class="loading-spinner" id="users-loading">
         <div class="spinner"></div>
-        Loading users from Airtable…
+        Loading users…
       </div>
-      <table id="users-table" style="display:none">
+      <table id="users-table" style="display:none" class="bgt-table">
         <thead>
           <tr>
-            <th>Name</th>
-            <th>Email</th>
+            <th style="text-align:left">Name</th>
+            <th style="text-align:left">Email</th>
             <th>Role</th>
-            <th>Properties</th>
+            <th>Phone</th>
             <th>Status</th>
           </tr>
         </thead>
@@ -972,39 +974,125 @@
     usersTableId: 'tblyZezYKlxEOW9M5',
   };
 
-  // ── Load Properties ──
+  // ── Shared Airtable token (injected by deploy) ──
+  const AT_TOKEN = '__AIRTABLE_TOKEN__';
+  const AT_BASE = 'app27jUbqonTIiHXY';
+
+  // ── Properties Data (shared across modules) ──
+  let propertiesData = [];  // Airtable records
   let propertiesLoaded = false;
-  function loadProperties() {
+
+  async function loadProperties() {
     if (propertiesLoaded) return;
-    // Show placeholder data for now (Airtable integration ready)
-    setTimeout(() => {
-      document.getElementById('properties-loading').style.display = 'none';
-      document.getElementById('properties-table').style.display = 'table';
-      document.getElementById('properties-tbody').innerHTML = `
-        <tr><td colspan="6" style="text-align:center; color:var(--text-dim); padding:32px;">
-          Connect Airtable to see your properties here.<br>
-          <span style="font-size:11px;">Tables have been created in your FMC Banking base.</span>
-        </td></tr>
-      `;
-      propertiesLoaded = true;
-    }, 600);
+    propertiesLoaded = true;
+    try {
+      const r = await fetch(`https://api.airtable.com/v0/${AT_BASE}/tbl63t0DN1HNhImZ6?pageSize=100`, {
+        headers: { 'Authorization': `Bearer ${AT_TOKEN}` }
+      });
+      if (!r.ok) throw new Error(`HTTP ${r.status}`);
+      const data = await r.json();
+      propertiesData = data.records.map(rec => ({
+        id: rec.id,
+        name: rec.fields['Property Name'] || '',
+        type: rec.fields['Property Type']?.name || rec.fields['Property Type'] || '',
+        address: rec.fields['Address'] || '',
+        city: rec.fields['City'] || '',
+        state: rec.fields['State'] || '',
+        sqft: rec.fields['Square Footage'] || 0,
+        entity: rec.fields['Entity Name'] || '',
+        status: rec.fields['Status']?.name || rec.fields['Status'] || '',
+        notes: rec.fields['Notes'] || '',
+      }));
+      renderProperties();
+    } catch (e) {
+      console.error('Properties load error:', e);
+      document.getElementById('properties-loading').innerHTML = `<span style="color:#e5534b">Failed to load: ${e.message}</span>`;
+    }
+  }
+
+  function renderProperties() {
+    document.getElementById('properties-loading').style.display = 'none';
+    document.getElementById('properties-table').style.display = 'table';
+    const tbody = document.getElementById('properties-tbody');
+    if (!propertiesData.length) {
+      tbody.innerHTML = '<tr><td colspan="8" style="text-align:center;color:var(--text-dim);padding:32px;">No properties found.</td></tr>';
+      return;
+    }
+    tbody.innerHTML = propertiesData.sort((a,b) => a.name.localeCompare(b.name)).map(p => {
+      const hasBudget = bgtData && bgtData.find(b => b.name.toLowerCase() === p.name.toLowerCase());
+      const statusColor = p.status === 'Active' ? 'var(--green)' : 'var(--text-dim)';
+      return `<tr style="cursor:pointer" onclick="propGoToBudget('${p.name.replace(/'/g,"\\'")}')">
+        <td style="text-align:left;font-weight:600;">${p.name}</td>
+        <td style="text-align:left">${p.address}</td>
+        <td style="text-align:left">${p.city}</td>
+        <td style="text-align:center">${p.state}</td>
+        <td style="text-align:right;font-variant-numeric:tabular-nums;">${p.sqft ? p.sqft.toLocaleString() : '—'}</td>
+        <td style="text-align:left;font-size:11px;color:var(--text-dim)">${p.entity}</td>
+        <td style="text-align:center"><span style="color:${statusColor};font-weight:600;font-size:11px">${p.status || '—'}</span></td>
+        <td style="text-align:center">${hasBudget ? '<span style="font-size:10px;color:var(--accent);font-weight:600;cursor:pointer">View Budget →</span>' : ''}</td>
+      </tr>`;
+    }).join('');
+  }
+
+  function propGoToBudget(name) {
+    switchView('budgeting');
+    // Wait for bgtInit, then select the property
+    bgtInit().then(() => {
+      if (!bgtData) return;
+      const idx = bgtData.findIndex(b => b.name.toLowerCase() === name.toLowerCase());
+      if (idx >= 0) {
+        document.getElementById('bgtPropSelect').value = idx;
+        bgtSelectProp();
+      }
+    });
   }
 
   // ── Load Users ──
+  let usersData = [];
   let usersLoaded = false;
-  function loadUsers() {
+
+  async function loadUsers() {
     if (usersLoaded) return;
-    setTimeout(() => {
-      document.getElementById('users-loading').style.display = 'none';
-      document.getElementById('users-table').style.display = 'table';
-      document.getElementById('users-tbody').innerHTML = `
-        <tr><td colspan="5" style="text-align:center; color:var(--text-dim); padding:32px;">
-          Connect Airtable to see your users here.<br>
-          <span style="font-size:11px;">Tables have been created in your FMC Banking base.</span>
-        </td></tr>
-      `;
-      usersLoaded = true;
-    }, 600);
+    usersLoaded = true;
+    try {
+      const r = await fetch(`https://api.airtable.com/v0/${AT_BASE}/tblyZezYKlxEOW9M5?pageSize=100`, {
+        headers: { 'Authorization': `Bearer ${AT_TOKEN}` }
+      });
+      if (!r.ok) throw new Error(`HTTP ${r.status}`);
+      const data = await r.json();
+      usersData = data.records.map(rec => ({
+        id: rec.id,
+        name: rec.fields['Full Name'] || '',
+        email: rec.fields['Email'] || '',
+        role: rec.fields['Role']?.name || rec.fields['Role'] || '',
+        phone: rec.fields['Phone'] || '',
+        status: rec.fields['Status']?.name || rec.fields['Status'] || '',
+      }));
+      renderUsers();
+    } catch (e) {
+      console.error('Users load error:', e);
+      document.getElementById('users-loading').innerHTML = `<span style="color:#e5534b">Failed to load: ${e.message}</span>`;
+    }
+  }
+
+  function renderUsers() {
+    document.getElementById('users-loading').style.display = 'none';
+    document.getElementById('users-table').style.display = 'table';
+    const tbody = document.getElementById('users-tbody');
+    if (!usersData.length) {
+      tbody.innerHTML = '<tr><td colspan="5" style="text-align:center;color:var(--text-dim);padding:32px;">No users found.</td></tr>';
+      return;
+    }
+    tbody.innerHTML = usersData.sort((a,b) => a.name.localeCompare(b.name)).map(u => {
+      const statusColor = u.status === 'Active' ? 'var(--green)' : 'var(--text-dim)';
+      return `<tr>
+        <td style="text-align:left;font-weight:600">${u.name}</td>
+        <td style="text-align:left"><a href="mailto:${u.email}" style="color:var(--accent);text-decoration:none">${u.email}</a></td>
+        <td style="text-align:center">${u.role}</td>
+        <td style="text-align:center">${u.phone || '—'}</td>
+        <td style="text-align:center"><span style="color:${statusColor};font-weight:600;font-size:11px">${u.status || '—'}</span></td>
+      </tr>`;
+    }).join('');
   }
 
   // ══════════════════════════════════════
