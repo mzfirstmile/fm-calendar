@@ -589,9 +589,8 @@ You can answer questions about upcoming deadlines, what's overdue, who owns what
 </div>
 <div class="toast" id="toast"></div>
 <script>
-if (new URLSearchParams(location.search).get('embed') === '1') {
+if (window.parent !== window) {
   document.querySelector('header').style.display = 'none';
-  document.querySelector('.setup-overlay')?.classList.add('hidden');
 }
 </script>
 </body>

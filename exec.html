@@ -2060,7 +2060,7 @@ async function confirmDeleteLiability(recordId) {
 }
 </script>
 <script>
-if (new URLSearchParams(location.search).get('embed') === '1') {
+if (window.parent !== window) {
   document.getElementById('mainHeader').style.display = 'none';
 }
 </script>
