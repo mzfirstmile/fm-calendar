@@ -496,8 +496,14 @@
   .bgt-table td:first-child { text-align:left; font-weight:500; }
   .bgt-row-header td {
     font-weight:700 !important; font-size:11px; letter-spacing:.5px; text-transform:uppercase;
-    border-top:2px solid var(--border); padding:9px 12px;
+    border-top:2px solid var(--border); padding:9px 12px; cursor:pointer; user-select:none;
   }
+  .bgt-row-header td .bgt-chevron {
+    display:inline-block; width:14px; font-size:10px; margin-right:4px;
+    transition:transform .2s; transform:rotate(90deg);
+  }
+  .bgt-row-header.collapsed td .bgt-chevron { transform:rotate(0deg); }
+  .bgt-detail-row.bgt-hidden { display:none; }
   .bgt-row-header.bgt-section-income td { background:rgba(20,168,142,.08); color:#0e7c6b; border-top:2.5px solid rgba(20,168,142,.35); }
   .bgt-row-header.bgt-section-expense td { background:rgba(229,83,75,.08); color:#c0392b; border-top:2.5px solid rgba(229,83,75,.35); }
   .bgt-row-header.bgt-section-noi td { background:rgba(0,176,212,.08); color:var(--accent); border-top:2.5px solid rgba(0,176,212,.35); }
@@ -2295,8 +2301,10 @@ Budget data is available via get_budget_summary for: 61 S Paramus (281,504 SF), 
       </tr></thead><tbody>`;
     }
 
+    let sectionIdx = 0;
     (p.summaryRows || p.rows || []).forEach(row => {
       if (row.isHeader) {
+        sectionIdx++;
         const label = row.label;
         if (label.includes('EXPENSE') || label.includes('OPERATING')) isExpenseSection = true;
         if (label === 'INCOME') isExpenseSection = false;
@@ -2304,7 +2312,7 @@ Budget data is available via get_budget_summary for: 61 S Paramus (281,504 SF), 
         if (label === 'INCOME' || label.includes('REVENUE')) sectionCls = 'bgt-section-income';
         else if (label.includes('EXPENSE') || label.includes('OPERATING')) sectionCls = 'bgt-section-expense';
         else if (label.includes('NOI') || label.includes('NET OPERATING')) sectionCls = 'bgt-section-noi';
-        html += `<tr class="bgt-row-header ${sectionCls}"><td colspan="${colSpan}">${label}</td></tr>`;
+        html += `<tr class="bgt-row-header collapsed ${sectionCls}" data-section="${sectionIdx}" onclick="fbToggleSection(this)"><td colspan="${colSpan}"><span class="bgt-chevron">&#9654;</span>${label}</td></tr>`;
         return;
       }
       let totalCls = '';
@@ -2315,7 +2323,9 @@ Budget data is available via get_budget_summary for: 61 S Paramus (281,504 SF), 
         else if (lbl.includes('total recoverable') || lbl.includes('total operating') || lbl === 'total expenses') totalCls = 'bgt-row-total bgt-total-expense';
         else totalCls = 'bgt-row-total';
       }
-      const cls = row.isTotal ? ` class="${totalCls}"` : '';
+      // Detail (non-total) rows start hidden; total rows always visible
+      const detailHide = !row.isTotal ? ' bgt-detail-row bgt-hidden' : '';
+      const cls = row.isTotal ? ` class="${totalCls}" data-section="${sectionIdx}"` : ` class="${detailHide.trim()}" data-section="${sectionIdx}"`;
 
       if (status === 'planning') {
         // For planning year (2027), all values start at 0 until user fills them
@@ -2383,6 +2393,16 @@ Budget data is available via get_budget_summary for: 61 S Paramus (281,504 SF), 
 
     html += '</tbody></table></div>';
     body.innerHTML = html;
+  }
+
+  function fbToggleSection(headerRow) {
+    const sec = headerRow.dataset.section;
+    const isCollapsed = headerRow.classList.contains('collapsed');
+    headerRow.classList.toggle('collapsed');
+    const table = headerRow.closest('table');
+    table.querySelectorAll(`tr.bgt-detail-row[data-section="${sec}"]`).forEach(r => {
+      r.classList.toggle('bgt-hidden', !isCollapsed);
+    });
   }
 
   function fbRenderMonthlyDetail(body, p, section) {
