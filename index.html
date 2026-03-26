@@ -793,7 +793,7 @@
 
     <div class="module-grid">
       <!-- Accounting Calendar -->
-      <div class="module-card" onclick="switchView('calendar')" style="cursor:pointer">
+      <div class="module-card" data-module="calendar" onclick="switchView('calendar')" style="cursor:pointer">
         <div class="module-card-icon calendar">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
         </div>
@@ -806,7 +806,7 @@
       </div>
 
       <!-- Property Financials & Budgeting -->
-      <div class="module-card" onclick="switchView('financials')" style="cursor:pointer">
+      <div class="module-card" data-module="financials" onclick="switchView('financials')" style="cursor:pointer">
         <div class="module-card-icon financials">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 000 7h5a3.5 3.5 0 010 7H6"/></svg>
         </div>
@@ -818,7 +818,21 @@
         <div class="module-card-status live"><span class="dot"></span> Live</div>
       </div>
 
-      <div class="module-card" onclick="switchView('forecasting')" style="cursor:pointer">
+      <!-- Executive Financials -->
+      <div class="module-card" data-module="exec" onclick="window.open('exec.html','_blank')" style="cursor:pointer">
+        <div class="module-card-icon" style="background:linear-gradient(135deg,#283d55,#1e2d44)">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12V7H5a2 2 0 010-4h14v4"/><path d="M3 5v14a2 2 0 002 2h16v-5"/><path d="M18 12a2 2 0 000 4h4v-4h-4z"/></svg>
+        </div>
+        <div class="module-card-arrow">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg>
+        </div>
+        <h3>Executive Financials</h3>
+        <p>Portfolio-level financial overview, corporate accounts, and investor reporting dashboard.</p>
+        <div class="module-card-status live"><span class="dot"></span> Live</div>
+      </div>
+
+      <!-- Strategic Forecasting -->
+      <div class="module-card" data-module="forecasting" onclick="switchView('forecasting')" style="cursor:pointer">
         <div class="module-card-icon forecasting">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
         </div>
@@ -874,14 +888,7 @@
       </div>
       <table id="users-table" style="display:none" class="bgt-table">
         <thead>
-          <tr>
-            <th style="text-align:left">Name</th>
-            <th style="text-align:left">Email</th>
-            <th style="text-align:center">Admin</th>
-            <th style="text-align:center">First Login</th>
-            <th style="text-align:center">Last Login</th>
-            <th style="text-align:center">Access</th>
-          </tr>
+          <tr></tr>
         </thead>
         <tbody id="users-tbody"></tbody>
       </table>
@@ -1069,8 +1076,9 @@
   let currentUser = null; // { email, name, initials }
 
   function msalInit() {
-    if (MSAL_CLIENT_ID.includes('__MSAL_CLIENT_ID__')) {
-      console.warn('MSAL not configured — skipping auth');
+    const isLocal = ['localhost','127.0.0.1'].includes(window.location.hostname);
+    if (isLocal || MSAL_CLIENT_ID.includes('__MSAL_CLIENT_ID__')) {
+      console.warn(isLocal ? 'Localhost detected — bypassing SSO' : 'MSAL not configured — skipping auth');
       authBypass();
       return;
     }
@@ -1166,10 +1174,19 @@
       name,
       initials,
       isAdmin: userRecord ? userRecord.is_admin : false,
+      access: {
+        calendar: userRecord ? userRecord.access_calendar !== false : true,
+        financials: userRecord ? userRecord.access_financials !== false : true,
+        forecasting: userRecord ? userRecord.access_forecasting !== false : true,
+        exec: userRecord ? userRecord.access_exec === true : false,
+        properties: userRecord ? userRecord.access_properties !== false : true,
+        users: userRecord ? (userRecord.access_users === true || userRecord.is_admin) : false,
+      },
     };
 
-    // Update UI with user info
+    // Update UI with user info and module visibility
     updateUserUI();
+    applyModuleAccess();
 
     // Hide login overlay
     document.getElementById('loginOverlay').classList.add('hidden');
@@ -1238,6 +1255,31 @@
     if (greeting) greeting.textContent = `Welcome back, ${currentUser.name.split(' ')[0]}`;
   }
 
+  function applyModuleAccess() {
+    if (!currentUser) return;
+    const access = currentUser.access || {};
+    // Sidebar items
+    document.querySelectorAll('.sidebar-item[data-view]').forEach(el => {
+      const view = el.dataset.view;
+      if (view === 'home') return; // always visible
+      const key = view === 'exec' ? 'exec' : view;
+      if (access[key] === false) {
+        el.style.display = 'none';
+      } else {
+        el.style.display = '';
+      }
+    });
+    // Home module cards
+    document.querySelectorAll('.module-card[data-module]').forEach(el => {
+      const mod = el.dataset.module;
+      if (access[mod] === false) {
+        el.style.display = 'none';
+      } else {
+        el.style.display = '';
+      }
+    });
+  }
+
   function msalLogout() {
     currentUser = null;
     sessionStorage.clear();
@@ -1250,8 +1292,12 @@
 
   // Dev bypass when MSAL not configured
   function authBypass() {
-    currentUser = { email: 'mz@firstmilecap.com', name: 'Morris Zeitouni', initials: 'MZ', isAdmin: true };
+    currentUser = {
+      email: 'mz@firstmilecap.com', name: 'Morris Zeitouni', initials: 'MZ', isAdmin: true,
+      access: { calendar: true, financials: true, forecasting: true, exec: true, properties: true, users: true }
+    };
     updateUserUI();
+    applyModuleAccess();
     document.getElementById('loginOverlay').classList.add('hidden');
     setTimeout(() => { document.getElementById('loginOverlay').style.display = 'none'; }, 400);
   }
@@ -1408,8 +1454,17 @@
   let usersData = [];
   let usersLoaded = false;
 
+  const MODULE_DEFS = [
+    { key: 'calendar', label: 'Calendar' },
+    { key: 'financials', label: 'Financials' },
+    { key: 'exec', label: 'Exec' },
+    { key: 'forecasting', label: 'Forecasting' },
+    { key: 'properties', label: 'Properties' },
+    { key: 'users', label: 'Users' },
+  ];
+
   async function loadUsers() {
-    usersLoaded = false; // always refresh
+    usersLoaded = false;
     try {
       const users = await supaFetch('app_users', '?order=display_name');
       usersData = users.map(u => ({
@@ -1420,6 +1475,12 @@
         isBlocked: u.is_blocked || false,
         firstLogin: u.first_login,
         lastLogin: u.last_login,
+        access_calendar: u.access_calendar !== false,
+        access_financials: u.access_financials !== false,
+        access_forecasting: u.access_forecasting !== false,
+        access_exec: u.access_exec === true,
+        access_properties: u.access_properties !== false,
+        access_users: u.access_users === true,
       }));
       renderUsers();
     } catch (e) {
@@ -1432,16 +1493,22 @@
     document.getElementById('users-loading').style.display = 'none';
     document.getElementById('users-table').style.display = 'table';
     const tbody = document.getElementById('users-tbody');
+    const thead = document.querySelector('#users-table thead tr');
     const isAdmin = currentUser && currentUser.isAdmin;
+
+    // Build header dynamically
+    thead.innerHTML = `
+      <th style="text-align:left">Name</th>
+      <th style="text-align:left">Email</th>
+      <th style="text-align:center">Last Login</th>
+      ${MODULE_DEFS.map(m => `<th style="text-align:center;font-size:10px;min-width:60px">${m.label}</th>`).join('')}
+      <th style="text-align:center">Status</th>`;
+
+    const colCount = 3 + MODULE_DEFS.length + 1;
     if (!usersData.length) {
-      tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;color:var(--text-dim);padding:32px;">No users have signed in yet.</td></tr>';
+      tbody.innerHTML = `<tr><td colspan="${colCount}" style="text-align:center;color:var(--text-dim);padding:32px;">No users have signed in yet.</td></tr>`;
       return;
     }
-    const fmtDate = (d) => {
-      if (!d) return '—';
-      const dt = new Date(d);
-      return dt.toLocaleDateString('en-US', { month:'short', day:'numeric', year:'numeric' });
-    };
     const fmtTime = (d) => {
       if (!d) return '—';
       const dt = new Date(d);
@@ -1451,31 +1518,67 @@
     };
     tbody.innerHTML = usersData.sort((a,b) => a.name.localeCompare(b.name)).map(u => {
       const isSelf = currentUser && currentUser.email === u.email;
-      const statusColor = u.isBlocked ? '#e5534b' : 'var(--green)';
-      const statusLabel = u.isBlocked ? 'Blocked' : 'Active';
-      const adminBadge = u.isAdmin ? '<span style="background:var(--accent);color:#fff;padding:2px 8px;border-radius:4px;font-size:10px;font-weight:700">Admin</span>' : '—';
-      let actionBtn = '';
+
+      // Module access toggles
+      const modCells = MODULE_DEFS.map(m => {
+        const field = `access_${m.key}`;
+        const hasAccess = u[field];
+        if (isAdmin && !isSelf) {
+          const checked = hasAccess ? 'checked' : '';
+          return `<td style="text-align:center"><input type="checkbox" ${checked} onchange="toggleModuleAccess(${u.id},'${field}',this.checked)" style="cursor:pointer;width:16px;height:16px;accent-color:var(--accent)"></td>`;
+        }
+        const icon = hasAccess
+          ? '<span style="color:var(--green);font-weight:700;font-size:14px">&#10003;</span>'
+          : '<span style="color:var(--text-dim)">—</span>';
+        return `<td style="text-align:center">${icon}</td>`;
+      }).join('');
+
+      // Status / Block button
+      let statusCell = '';
       if (isAdmin && !isSelf) {
         if (u.isBlocked) {
-          actionBtn = `<button onclick="toggleUserAccess(${u.id}, false)" style="background:var(--green);color:#fff;border:none;border-radius:6px;padding:5px 12px;font-size:11px;font-weight:600;cursor:pointer">Unblock</button>`;
+          statusCell = `<button onclick="toggleUserBlock(${u.id}, false)" style="background:var(--green);color:#fff;border:none;border-radius:6px;padding:5px 12px;font-size:11px;font-weight:600;cursor:pointer">Unblock</button>`;
         } else {
-          actionBtn = `<button onclick="toggleUserAccess(${u.id}, true)" style="background:#e5534b;color:#fff;border:none;border-radius:6px;padding:5px 12px;font-size:11px;font-weight:600;cursor:pointer">Block</button>`;
+          statusCell = `<button onclick="toggleUserBlock(${u.id}, true)" style="background:#e5534b;color:#fff;border:none;border-radius:6px;padding:5px 12px;font-size:11px;font-weight:600;cursor:pointer">Block</button>`;
         }
       } else if (isSelf) {
-        actionBtn = `<span style="color:var(--text-dim);font-size:11px">You</span>`;
+        statusCell = `<span style="color:var(--accent);font-size:11px;font-weight:600">You</span>`;
+      } else {
+        const c = u.isBlocked ? '#e5534b' : 'var(--green)';
+        statusCell = `<span style="color:${c};font-weight:600;font-size:11px">${u.isBlocked ? 'Blocked' : 'Active'}</span>`;
       }
-      return `<tr>
-        <td style="text-align:left;font-weight:600">${u.name}</td>
-        <td style="text-align:left"><a href="mailto:${u.email}" style="color:var(--accent);text-decoration:none">${u.email}</a></td>
-        <td style="text-align:center">${adminBadge}</td>
-        <td style="text-align:center;font-size:11px;color:var(--text-dim)">${fmtDate(u.firstLogin)}</td>
+
+      const nameExtra = u.isAdmin ? ' <span style="background:var(--accent);color:#fff;padding:1px 6px;border-radius:3px;font-size:9px;font-weight:700;vertical-align:middle">ADMIN</span>' : '';
+      return `<tr style="${u.isBlocked ? 'opacity:.5' : ''}">
+        <td style="text-align:left;font-weight:600">${u.name}${nameExtra}</td>
+        <td style="text-align:left;font-size:12px"><a href="mailto:${u.email}" style="color:var(--accent);text-decoration:none">${u.email}</a></td>
         <td style="text-align:center;font-size:11px;color:var(--text-dim)">${fmtTime(u.lastLogin)}</td>
-        <td style="text-align:center">${actionBtn || `<span style="color:${statusColor};font-weight:600;font-size:11px">${statusLabel}</span>`}</td>
+        ${modCells}
+        <td style="text-align:center">${statusCell}</td>
       </tr>`;
     }).join('');
   }
 
-  async function toggleUserAccess(userId, block) {
+  async function toggleModuleAccess(userId, field, value) {
+    try {
+      await fetch(`${SUPABASE_URL}/rest/v1/app_users?id=eq.${userId}`, {
+        method: 'PATCH',
+        headers: {
+          'apikey': SUPABASE_KEY,
+          'Authorization': `Bearer ${SUPABASE_KEY}`,
+          'Content-Type': 'application/json',
+          'Prefer': 'return=minimal',
+        },
+        body: JSON.stringify({ [field]: value })
+      });
+    } catch (e) {
+      console.error('Toggle module access error:', e);
+      alert('Failed to update: ' + e.message);
+      loadUsers(); // refresh to revert UI
+    }
+  }
+
+  async function toggleUserBlock(userId, block) {
     try {
       await fetch(`${SUPABASE_URL}/rest/v1/app_users?id=eq.${userId}`, {
         method: 'PATCH',
@@ -1487,11 +1590,9 @@
         },
         body: JSON.stringify({ is_blocked: block })
       });
-      // Refresh
-      usersLoaded = false;
       await loadUsers();
     } catch (e) {
-      console.error('Toggle user access error:', e);
+      console.error('Toggle user block error:', e);
       alert('Failed to update user access: ' + e.message);
     }
   }
