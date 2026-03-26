@@ -2301,8 +2301,42 @@ Budget data is available via get_budget_summary for: 61 S Paramus (281,504 SF), 
       <th class="bgt-th-sub var1 bgt-col-v1">$</th><th class="bgt-th-sub var1">%</th>
     </tr></thead><tbody>`;
 
+    // Pre-build: map header labels → matching total rows so we can merge them
+    const allRows = p.summaryRows || p.rows || [];
+    const headerLabels = new Set(allRows.filter(r => r.isHeader).map(r => r.label.toUpperCase()));
+    const totalByHeader = {};
+    allRows.forEach(row => {
+      if (!row.isTotal) return;
+      // Match "TOTAL CLEANING" → "CLEANING", "TOTAL UTILITIES" → "UTILITIES", etc.
+      const stripped = row.label.replace(/^TOTAL\s+/i, '').toUpperCase();
+      if (headerLabels.has(stripped)) {
+        totalByHeader[stripped] = row;
+      }
+    });
+
+    // Helper: render value cells for a row
+    const renderValueCells = (row, fw) => {
+      const valA = annualOf(row);
+      const prevRow = prevRowsByLabel[row.label];
+      const valB = prevRow ? annualOf(prevRow) : 0;
+      const varDiff = valA - valB;
+      const varPct = valB !== 0 ? ((varDiff / Math.abs(valB)) * 100) : 0;
+      const vc = fbValClass(varDiff, isExpenseSection);
+      let cells = '';
+      cells += `<td class="bgt-col-a" style="text-align:right;font-weight:${fw}">${valA ? fmt(valA) : '—'}</td>`;
+      cells += `<td class="bgt-col-b" style="text-align:right">${valB ? fmt(valB) : '—'}</td>`;
+      if (valA && valB) {
+        cells += `<td class="bgt-col-v1 ${vc}" style="text-align:right">${fmt(varDiff)}</td>`;
+        cells += `<td class="${vc}" style="text-align:right">${fbFmtPct(varPct)}</td>`;
+      } else {
+        cells += `<td class="bgt-col-v1" style="text-align:right;color:var(--text-dim)">—</td>`;
+        cells += `<td style="text-align:right;color:var(--text-dim)">—</td>`;
+      }
+      return cells;
+    };
+
     let sectionIdx = 0;
-    (p.summaryRows || p.rows || []).forEach(row => {
+    allRows.forEach(row => {
       if (row.isHeader) {
         sectionIdx++;
         const label = row.label;
@@ -2312,9 +2346,28 @@ Budget data is available via get_budget_summary for: 61 S Paramus (281,504 SF), 
         if (label === 'INCOME' || label.includes('REVENUE')) sectionCls = 'bgt-section-income';
         else if (label.includes('EXPENSE') || label.includes('OPERATING')) sectionCls = 'bgt-section-expense';
         else if (label.includes('NOI') || label.includes('NET OPERATING')) sectionCls = 'bgt-section-noi';
-        html += `<tr class="bgt-row-header collapsed ${sectionCls}" data-section="${sectionIdx}" onclick="fbToggleSection(this)"><td colspan="${colSpan}"><span class="bgt-chevron">&#9654;</span>${label}</td></tr>`;
+
+        // Check if there's a matching total row to merge into this header
+        const matchTotal = totalByHeader[label.toUpperCase()];
+        if (matchTotal) {
+          // Render header with inline totals (no colspan)
+          html += `<tr class="bgt-row-header collapsed ${sectionCls}" data-section="${sectionIdx}" onclick="fbToggleSection(this)">`;
+          html += `<td><span class="bgt-chevron">&#9654;</span>${label}</td>`;
+          html += renderValueCells(matchTotal, '700');
+          html += `</tr>`;
+        } else {
+          // Major section header without a matching sub-total — full-width
+          html += `<tr class="bgt-row-header collapsed ${sectionCls}" data-section="${sectionIdx}" onclick="fbToggleSection(this)"><td colspan="${colSpan}"><span class="bgt-chevron">&#9654;</span>${label}</td></tr>`;
+        }
         return;
       }
+
+      // Skip total rows that were already merged into their header
+      if (row.isTotal) {
+        const stripped = row.label.replace(/^TOTAL\s+/i, '').toUpperCase();
+        if (totalByHeader[stripped] === row) return; // already shown in header
+      }
+
       let totalCls = '';
       if (row.isTotal) {
         const lbl = row.label.toLowerCase();
@@ -2326,31 +2379,10 @@ Budget data is available via get_budget_summary for: 61 S Paramus (281,504 SF), 
       const detailHide = !row.isTotal ? ' bgt-detail-row bgt-hidden' : '';
       const cls = row.isTotal ? ` class="${totalCls}" data-section="${sectionIdx}"` : ` class="${detailHide.trim()}" data-section="${sectionIdx}"`;
 
-      // Column A: current year budget (annual)
-      const valA = annualOf(row);
-      // Column B: prior year actuals (annual)
-      const prevRow = prevRowsByLabel[row.label];
-      const valB = prevRow ? annualOf(prevRow) : 0;
-
-      // Variance: budget minus actuals
-      const varDiff = valA - valB;
-      const varPct = valB !== 0 ? ((varDiff / Math.abs(valB)) * 100) : 0;
-      const vc = fbValClass(varDiff, isExpenseSection);
-
       const fw = row.isTotal ? '700' : '500';
-      const hasData = valA || valB; // at least one side has data
-
       html += `<tr${cls}>`;
       html += `<td>${row.label}</td>`;
-      html += `<td class="bgt-col-a" style="text-align:right;font-weight:${fw}">${valA ? fmt(valA) : '—'}</td>`;
-      html += `<td class="bgt-col-b" style="text-align:right">${valB ? fmt(valB) : '—'}</td>`;
-      if (valA && valB) {
-        html += `<td class="bgt-col-v1 ${vc}" style="text-align:right">${fmt(varDiff)}</td>`;
-        html += `<td class="${vc}" style="text-align:right">${fbFmtPct(varPct)}</td>`;
-      } else {
-        html += `<td class="bgt-col-v1" style="text-align:right;color:var(--text-dim)">—</td>`;
-        html += `<td style="text-align:right;color:var(--text-dim)">—</td>`;
-      }
+      html += renderValueCells(row, fw);
       html += '</tr>';
     });
 
