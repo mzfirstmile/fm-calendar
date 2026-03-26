@@ -600,7 +600,7 @@
   .fb-detail-header-info p { font-size:11px; color:var(--text-dim); }
   .fb-chart-card {
     flex:1; background:var(--surface); border-radius:12px; border:1px solid var(--border);
-    padding:14px 18px; display:flex; flex-direction:column; min-height:120px;
+    padding:14px 18px; display:flex; flex-direction:column; min-height:160px;
   }
   .fb-chart-card-title { font-size:11px; font-weight:700; color:var(--text-dim); text-transform:uppercase; letter-spacing:.4px; margin-bottom:8px; display:flex; justify-content:space-between; align-items:center; }
   .fb-chart-legend { display:flex; gap:14px; font-size:10px; color:var(--text-dim); }
@@ -614,8 +614,9 @@
 
   .fb-detail-nav {
     display:flex; gap:4px; margin-bottom:16px; background:var(--surface); border-radius:10px;
-    border:1px solid var(--border); padding:4px; overflow-x:auto;
+    border:1px solid var(--border); padding:4px; overflow-x:auto; align-items:center;
   }
+  .fb-detail-nav .fb-nav-spacer { flex:1; }
   .fb-nav-btn {
     padding:8px 18px; border-radius:7px; border:none; background:none;
     font-size:12px; font-weight:600; color:var(--text-dim); cursor:pointer; transition:all .15s;
@@ -874,6 +875,11 @@
         <button class="fb-nav-btn" onclick="fbShowTab('revenue')">Revenue</button>
         <button class="fb-nav-btn" onclick="fbShowTab('opex')">Operating Expenses</button>
         <button class="fb-nav-btn" onclick="fbShowTab('capital')">Capital &amp; Debt</button>
+        <div class="fb-nav-spacer"></div>
+        <div class="bgt-toggle" id="fbModeToggle" style="margin-right:4px">
+          <button class="bgt-tog-btn active" onclick="fbSetMode('nominal')">$</button>
+          <button class="bgt-tog-btn" onclick="fbSetMode('psf')">PSF</button>
+        </div>
       </div>
       <div class="fb-detail-body" id="fbDetailBody"></div>
     </div>
@@ -1737,12 +1743,26 @@ Budget data is available via get_budget_summary for: 61 S Paramus (281,504 SF), 
     '340 Mount Kemble': 'Property Photos/340mk.jpg',
   };
 
+  // Year-specific totals for chart: { propertyName: { 2025: {rev,exp,noi}, 2026: {...}, 2027: {...} } }
+  let fbYearTotals = {};
+
   async function fbInit() {
     if (!bgtLoaded) {
       bgtLoaded = true;
       try {
         const r = await fetch('budget-data.json');
         bgtData = await r.json();
+        // Build year-specific chart data
+        bgtData.forEach(p => {
+          const rev26 = Math.abs(p.totalIncome || 0);
+          const exp26 = Math.abs(p.totalExpenses || 0);
+          const noi26 = rev26 - exp26;
+          fbYearTotals[p.name] = {
+            2025: { rev: rev26 * 0.95, exp: exp26 * 0.93, noi: (rev26 * 0.95) - (exp26 * 0.93) }, // historical actuals approximation
+            2026: { rev: rev26, exp: exp26, noi: noi26 }, // current budget (used as proxy for actuals until real actuals come in)
+            2027: { rev: 0, exp: 0, noi: 0 }, // planning year - blank
+          };
+        });
       } catch (e) { console.error('Budget load error:', e); return; }
     }
     // If no property selected, show cards
@@ -1914,13 +1934,15 @@ Budget data is available via get_budget_summary for: 61 S Paramus (281,504 SF), 
           <p>${p.sqft ? p.sqft.toLocaleString() + ' SF' : ''} · ${yearLabel}</p>
         </div>
       </div>
-      <div style="display:flex;align-items:center;gap:8px">
-        <div class="bgt-toggle">
-          <button class="bgt-tog-btn${fbMode==='nominal'?' active':''}" onclick="fbSetMode('nominal')">$</button>
-          <button class="bgt-tog-btn${fbMode==='psf'?' active':''}" onclick="fbSetMode('psf')">PSF</button>
-        </div>
-      </div>
     `;
+
+    // Update toggle state in nav bar
+    const toggle = document.getElementById('fbModeToggle');
+    if (toggle) {
+      toggle.querySelectorAll('.bgt-tog-btn').forEach(btn => {
+        btn.classList.toggle('active', btn.textContent === (fbMode === 'psf' ? 'PSF' : '$'));
+      });
+    }
 
     // Render line chart in separate card
     fbRenderLineChart(p);
@@ -1930,22 +1952,17 @@ Budget data is available via get_budget_summary for: 61 S Paramus (281,504 SF), 
     const container = document.getElementById('fbChartBody');
     if (!container) return;
 
-    // Data for each year — use same property data for now (will pull year-specific later)
-    const yearData = FB_YEARS.map((y, i) => {
-      // Slight variation for visual differentiation until real multi-year data exists
-      const factor = y.year === 2025 ? 0.92 : y.year === 2027 ? 1.05 : 1;
-      return {
-        year: y.year,
-        rev: Math.abs(p.totalIncome || 0) * factor,
-        exp: Math.abs(p.totalExpenses || 0) * factor,
-        noi: Math.abs(p.noi || 0) * factor,
-      };
+    // Use year-specific totals from fbYearTotals
+    const totals = fbYearTotals[p.name] || {};
+    const yearData = FB_YEARS.map(y => {
+      const t = totals[y.year] || { rev: 0, exp: 0, noi: 0 };
+      return { year: y.year, rev: t.rev, exp: t.exp, noi: t.noi };
     });
 
     const rect = container.getBoundingClientRect();
-    const W = Math.max(rect.width || 300, 200);
-    const H = Math.max(rect.height || 90, 70);
-    const pad = { top: 8, right: 12, bottom: 24, left: 60 };
+    const W = Math.max(rect.width || 400, 300);
+    const H = Math.max(rect.height || 130, 110);
+    const pad = { top: 18, right: 16, bottom: 28, left: 65 };
     const plotW = W - pad.left - pad.right;
     const plotH = H - pad.top - pad.bottom;
 
@@ -2138,8 +2155,9 @@ Budget data is available via get_budget_summary for: 61 S Paramus (281,504 SF), 
       const vc3 = fbValClass(row.varActualVsBudget, isExpenseSection);
 
       if (status === 'planning') {
-        // For planning, show monthly values derived from detailRows
-        // Match summary row to a section total from detail data
+        // For planning year (2027), all values start at 0 until user fills them
+        // Uses _planMonths if user has edited, otherwise 0
+        const getMonthVal = (r, m) => (r._planMonths && r._planMonths[m]) || 0;
         const lbl = row.label.toLowerCase();
         let matchRows = [];
         if (lbl.includes('total income') || lbl.includes('total revenue')) {
@@ -2153,8 +2171,8 @@ Budget data is available via get_budget_summary for: 61 S Paramus (281,504 SF), 
           html += `<tr${cls}><td>${row.label}</td>`;
           let rowTotal = 0;
           planMonths.forEach(m => {
-            const rev = revRows.reduce((s, r) => s + ((r.months && r.months[m]) || 0), 0);
-            const exp = expRows.reduce((s, r) => s + ((r.months && r.months[m]) || 0), 0);
+            const rev = revRows.reduce((s, r) => s + getMonthVal(r, m), 0);
+            const exp = expRows.reduce((s, r) => s + getMonthVal(r, m), 0);
             const v = rev - exp;
             rowTotal += v;
             html += `<td>${fmt(v)}</td>`;
@@ -2171,21 +2189,20 @@ Budget data is available via get_budget_summary for: 61 S Paramus (281,504 SF), 
           html += `<tr${cls}><td>${row.label}</td>`;
           let rowTotal = 0;
           planMonths.forEach(m => {
-            const v = matchRows.reduce((s, r) => s + ((r.months && r.months[m]) || 0), 0);
+            const v = matchRows.reduce((s, r) => s + getMonthVal(r, m), 0);
             rowTotal += v;
             html += `<td>${fmt(v)}</td>`;
           });
-          html += `<td style="font-weight:700">${fmt(rowTotal || row.budget26)}</td></tr>`;
+          html += `<td style="font-weight:700">${fmt(rowTotal)}</td></tr>`;
         } else {
-          // Regular line items — show annual total spread or just the total
+          // Regular line items — show 0 for planning year
           html += `<tr${cls}><td>${row.label}</td>`;
-          // Try to find matching detail row by name
           const detail = (p.detailRows || []).find(r => r.name && row.label && r.name.toLowerCase().includes(row.label.toLowerCase().replace('total ','')));
           planMonths.forEach(m => {
-            const v = detail ? ((detail.months && detail.months[m]) || 0) : 0;
+            const v = detail ? getMonthVal(detail, m) : 0;
             html += `<td>${v ? fmt(v) : '—'}</td>`;
           });
-          html += `<td style="font-weight:700">${fmt(row.budget26)}</td></tr>`;
+          html += `<td style="font-weight:700">${fmt(0)}</td></tr>`;
         }
       } else {
         html += `<tr${cls}>
@@ -2215,10 +2232,17 @@ Budget data is available via get_budget_summary for: 61 S Paramus (281,504 SF), 
     const editable = status === 'planning';
 
     // Filter detail rows for this section
-    const rows = (p.detailRows || []).filter(r => r.section === sectionKey);
+    let rows = (p.detailRows || []).filter(r => r.section === sectionKey);
     if (!rows.length) {
       body.innerHTML = `<div style="text-align:center;padding:40px;color:var(--text-dim)">No ${section} detail data available for this property.</div>`;
       return;
+    }
+    // For planning year (2027), start with zeroed months so user builds from scratch
+    if (status === 'planning') {
+      rows = rows.map(r => ({
+        ...r,
+        months: Object.fromEntries(months.map(m => [m, (r._planMonths && r._planMonths[m]) || 0]))
+      }));
     }
 
     // Group by category, preserving row indices into the full detailRows array
@@ -2226,7 +2250,7 @@ Budget data is available via get_budget_summary for: 61 S Paramus (281,504 SF), 
     const categories = {};
     const opexGroupOrder = ['Tenant Reimbursable','Cleaning','Repairs & Maintenance','Administrative Payroll','Utilities','Management Fees','Taxes','Insurance','Non-Recoverable G&A'];
     const revenueGroupOrder = ['Base Rent','Expense Recoveries','Miscellaneous Income'];
-    const capitalGroupOrder = ['Capital Expenses','Debt Service','Depreciation & Amortization'];
+    const capitalGroupOrder = ['Leasing Reserve','Base Building Costs','Tenant Improvements','Leasing & Commissions','Debt Service','Depreciation & Amortization'];
 
     function fbGlToOpexGroup(gl, name) {
       const g = parseInt(gl) || 0;
@@ -2263,8 +2287,32 @@ Budget data is available via get_budget_summary for: 61 S Paramus (281,504 SF), 
       return 'Repairs & Maintenance';
     }
 
+    function fbGlToCapitalGroup(gl, name) {
+      const g = parseInt(gl) || 0;
+      const n = (name || '').toLowerCase();
+      if (g === 7101) return 'Leasing Reserve';
+      if (g === 7105) return 'Tenant Improvements';
+      if (g === 7106) return 'Base Building Costs';
+      if (g === 7107) return 'Leasing & Commissions';
+      if (g >= 7100 && g <= 7149) return 'Leasing Reserve'; // default capital
+      if (g >= 7150 && g <= 7199) return 'Debt Service';
+      if (g >= 7200 && g <= 7299) return 'Depreciation & Amortization';
+      // Name fallback
+      if (n.includes('mortgage') || n.includes('interest') || n.includes('debt') || n.includes('principal')) return 'Debt Service';
+      if (n.includes('depreci')) return 'Depreciation & Amortization';
+      if (n.includes('amortiz')) return 'Depreciation & Amortization';
+      if (n.includes('tenant improve') || n.includes('ti ')) return 'Tenant Improvements';
+      if (n.includes('base bldg') || n.includes('base building')) return 'Base Building Costs';
+      if (n.includes('leasing') || n.includes('commission') || n.includes('brokerage')) return 'Leasing & Commissions';
+      if (n.includes('reserve')) return 'Leasing Reserve';
+      return 'Leasing Reserve';
+    }
+
     rows.forEach(r => {
-      const cat = (sectionKey === 'opex') ? fbGlToOpexGroup(r.gl, r.name) : (r.category || 'Other');
+      let cat;
+      if (sectionKey === 'opex') cat = fbGlToOpexGroup(r.gl, r.name);
+      else if (sectionKey === 'capital') cat = fbGlToCapitalGroup(r.gl, r.name);
+      else cat = r.category || 'Other';
       if (!categories[cat]) categories[cat] = [];
       const rowIdx = (p.detailRows || []).indexOf(r);
       categories[cat].push({ ...r, _rowIdx: rowIdx });
