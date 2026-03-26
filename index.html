@@ -496,6 +496,29 @@
   .bgt-empty p { font-size:14px; font-weight:600; margin-bottom:4px; }
   .bgt-empty .sub { font-size:12px; font-weight:400; }
 
+  /* ── Chat Widget ── */
+  .chat-fab { position:fixed; bottom:24px; right:24px; width:52px; height:52px; border-radius:50%; background:var(--accent); color:#fff; border:none; cursor:pointer; box-shadow:0 4px 16px rgba(0,176,212,.35); z-index:300; display:flex; align-items:center; justify-content:center; transition:all .2s; font-size:22px; }
+  .chat-fab:hover { transform:scale(1.08); box-shadow:0 6px 24px rgba(0,176,212,.45); }
+  .chat-fab.open { background:var(--text); }
+  .chat-panel { position:fixed; bottom:88px; right:24px; width:400px; max-height:520px; background:var(--surface); border:1px solid var(--border); border-radius:14px; box-shadow:0 16px 48px rgba(0,0,0,.15); z-index:300; display:none; flex-direction:column; overflow:hidden; }
+  .chat-panel.show { display:flex; }
+  .chat-header { padding:14px 16px; border-bottom:1px solid var(--border); display:flex; align-items:center; gap:10px; }
+  .chat-header-icon { width:28px; height:28px; background:var(--accent); border-radius:8px; display:flex; align-items:center; justify-content:center; color:#fff; font-size:14px; }
+  .chat-header-text { font-size:13px; font-weight:600; }
+  .chat-header-sub { font-size:10px; color:var(--text-dim); }
+  .chat-body { flex:1; overflow-y:auto; padding:14px; display:flex; flex-direction:column; gap:10px; max-height:360px; }
+  .chat-msg { max-width:85%; padding:9px 13px; border-radius:12px; font-size:12.5px; line-height:1.5; word-wrap:break-word; }
+  .chat-msg.user { align-self:flex-end; background:var(--accent); color:#fff; border-bottom-right-radius:4px; }
+  .chat-msg.bot { align-self:flex-start; background:var(--surface2); color:var(--text); border-bottom-left-radius:4px; }
+  .chat-msg.bot .tool-call { font-size:10px; color:var(--accent); font-weight:600; margin-bottom:4px; display:flex; align-items:center; gap:4px; }
+  .chat-msg.thinking { opacity:.6; font-style:italic; }
+  .chat-input-wrap { padding:10px 14px; border-top:1px solid var(--border); display:flex; gap:8px; }
+  .chat-input { flex:1; padding:9px 12px; border:1px solid var(--border); border-radius:8px; font-size:12.5px; background:var(--surface2); color:var(--text); resize:none; font-family:inherit; }
+  .chat-input:focus { outline:none; border-color:var(--accent); }
+  .chat-send { width:34px; height:34px; border-radius:8px; background:var(--accent); color:#fff; border:none; cursor:pointer; display:flex; align-items:center; justify-content:center; font-size:15px; transition:all .15s; flex-shrink:0; }
+  .chat-send:hover { background:#009bb8; }
+  .chat-send:disabled { opacity:.4; cursor:default; }
+
   /* ── Responsive ── */
   @media (max-width: 768px) {
     .sidebar { width: 60px; }
@@ -506,6 +529,7 @@
     .sidebar-item { justify-content: center; padding: 12px; border-left: none; }
     .home-view, .manage-view { padding: 20px; }
     .module-grid { grid-template-columns: 1fr; }
+    .chat-panel { width:calc(100vw - 20px); right:10px; bottom:80px; }
   }
 </style>
 </head>
@@ -862,6 +886,25 @@
     </div>
   </div>
 
+</div>
+
+<!-- Chat Widget -->
+<button class="chat-fab" id="chatFab" onclick="chatToggle()">💬</button>
+<div class="chat-panel" id="chatPanel">
+  <div class="chat-header">
+    <div class="chat-header-icon">AI</div>
+    <div>
+      <div class="chat-header-text">First Mile Assistant</div>
+      <div class="chat-header-sub">Ask about your data or request changes</div>
+    </div>
+  </div>
+  <div class="chat-body" id="chatBody">
+    <div class="chat-msg bot">Hi Morris! I can help you query and update your Airtable data — properties, budgets, calendar tasks, and more. Try asking me something.</div>
+  </div>
+  <div class="chat-input-wrap">
+    <input class="chat-input" id="chatInput" placeholder="Ask about your data…" onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();chatSend();}">
+    <button class="chat-send" id="chatSendBtn" onclick="chatSend()">→</button>
+  </div>
 </div>
 
 <script>
@@ -1279,6 +1322,210 @@
     } catch (e) {
       alert('Delete failed: ' + e.message);
     }
+  }
+
+  // ══════════════════════════════════════
+  // ── CHAT WIDGET ──
+  // ══════════════════════════════════════
+  const CLAUDE_KEY = '__CLAUDE_API_KEY__';
+  const CHAT_AT_TOKEN = '__AIRTABLE_TOKEN__';
+  const CHAT_BASE = 'app27jUbqonTIiHXY';
+  let chatOpen = false, chatBusy = false;
+  let chatHistory = [];
+
+  function chatToggle() {
+    chatOpen = !chatOpen;
+    document.getElementById('chatPanel').classList.toggle('show', chatOpen);
+    document.getElementById('chatFab').classList.toggle('open', chatOpen);
+    document.getElementById('chatFab').textContent = chatOpen ? '✕' : '💬';
+    if (chatOpen) document.getElementById('chatInput').focus();
+  }
+
+  function chatAddMsg(role, html, cls) {
+    const body = document.getElementById('chatBody');
+    const div = document.createElement('div');
+    div.className = `chat-msg ${role}${cls ? ' '+cls : ''}`;
+    div.innerHTML = html;
+    body.appendChild(div);
+    body.scrollTop = body.scrollHeight;
+    return div;
+  }
+
+  async function chatSend() {
+    if (chatBusy) return;
+    const input = document.getElementById('chatInput');
+    const msg = input.value.trim();
+    if (!msg) return;
+    input.value = '';
+    chatAddMsg('user', msg);
+
+    chatBusy = true;
+    document.getElementById('chatSendBtn').disabled = true;
+    const thinking = chatAddMsg('bot', 'Thinking…', 'thinking');
+
+    chatHistory.push({ role: 'user', content: msg });
+
+    try {
+      const result = await chatCall(chatHistory);
+      thinking.remove();
+      chatAddMsg('bot', result);
+      chatHistory.push({ role: 'assistant', content: result });
+    } catch (e) {
+      thinking.remove();
+      chatAddMsg('bot', 'Error: ' + e.message);
+    }
+    chatBusy = false;
+    document.getElementById('chatSendBtn').disabled = false;
+  }
+
+  const CHAT_TOOLS = [
+    {
+      name: 'airtable_list_records',
+      description: 'List records from an Airtable table. Tables: Calendar Tasks (tblxLACz3bkSxnMyt) - accounting deadlines; Properties (tbl63t0DN1HNhImZ6) - property metadata; Users (tblyZezYKlxEOW9M5) - team members. All in base app27jUbqonTIiHXY.',
+      input_schema: {
+        type: 'object',
+        properties: {
+          tableId: { type: 'string', description: 'Table ID (tblxLACz3bkSxnMyt, tbl63t0DN1HNhImZ6, or tblyZezYKlxEOW9M5)' },
+          maxRecords: { type: 'number', description: 'Max records to return (default 50)' }
+        },
+        required: ['tableId']
+      }
+    },
+    {
+      name: 'airtable_update_record',
+      description: 'Update a record in Airtable. Provide the table ID, record ID, and fields to update.',
+      input_schema: {
+        type: 'object',
+        properties: {
+          tableId: { type: 'string', description: 'Table ID' },
+          recordId: { type: 'string', description: 'Record ID (starts with rec)' },
+          fields: { type: 'object', description: 'Fields to update as key-value pairs' }
+        },
+        required: ['tableId', 'recordId', 'fields']
+      }
+    },
+    {
+      name: 'airtable_create_record',
+      description: 'Create a new record in an Airtable table.',
+      input_schema: {
+        type: 'object',
+        properties: {
+          tableId: { type: 'string', description: 'Table ID' },
+          fields: { type: 'object', description: 'Fields for the new record' }
+        },
+        required: ['tableId', 'fields']
+      }
+    },
+    {
+      name: 'get_budget_summary',
+      description: 'Get the budget summary data for a property. Properties: 61 S Paramus, Paramus Plaza, 575 Broadway, 1700 East Putnam, 340 Mount Kemble.',
+      input_schema: {
+        type: 'object',
+        properties: {
+          propertyName: { type: 'string', description: 'Property name' }
+        },
+        required: ['propertyName']
+      }
+    }
+  ];
+
+  async function chatExecTool(name, input) {
+    if (name === 'airtable_list_records') {
+      const max = input.maxRecords || 50;
+      const r = await fetch(`https://api.airtable.com/v0/${CHAT_BASE}/${input.tableId}?pageSize=${max}`, {
+        headers: { 'Authorization': `Bearer ${CHAT_AT_TOKEN}` }
+      });
+      const data = await r.json();
+      return JSON.stringify(data.records?.map(rec => ({ id: rec.id, ...rec.fields })) || data);
+    }
+    if (name === 'airtable_update_record') {
+      const r = await fetch(`https://api.airtable.com/v0/${CHAT_BASE}/${input.tableId}`, {
+        method: 'PATCH',
+        headers: { 'Authorization': `Bearer ${CHAT_AT_TOKEN}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ records: [{ id: input.recordId, fields: input.fields }] })
+      });
+      const data = await r.json();
+      return JSON.stringify(data);
+    }
+    if (name === 'airtable_create_record') {
+      const r = await fetch(`https://api.airtable.com/v0/${CHAT_BASE}/${input.tableId}`, {
+        method: 'POST',
+        headers: { 'Authorization': `Bearer ${CHAT_AT_TOKEN}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ records: [{ fields: input.fields }] })
+      });
+      const data = await r.json();
+      return JSON.stringify(data);
+    }
+    if (name === 'get_budget_summary') {
+      if (!bgtData) { try { const r = await fetch('budget-data.json'); bgtData = await r.json(); } catch(e) { return 'Budget data not available'; } }
+      const prop = bgtData.find(p => p.name.toLowerCase().includes(input.propertyName.toLowerCase()));
+      if (!prop) return 'Property not found. Available: ' + bgtData.map(p => p.name).join(', ');
+      const summary = prop.rows.filter(r => r.isTotal || r.isHeader).map(r => ({
+        label: r.label, budget26: r.budget26, actuals25: r.actuals25, budget25: r.budget25,
+        varBvsA: r.varBudgetVsActual, varBvsAPct: r.varBudgetVsActualPct
+      }));
+      return JSON.stringify({ name: prop.name, entity: prop.entity, sqft: prop.sqft, summary });
+    }
+    return 'Unknown tool';
+  }
+
+  async function chatCall(messages, depth) {
+    depth = depth || 0;
+    if (depth > 5) return 'Too many tool calls, stopping.';
+
+    const sysPrompt = `You are First Mile Capital's AI assistant embedded in the admin portal. You help Morris query and manage property data in Airtable. Be concise and helpful. When asked to look up data, use the tools. Format responses clearly. For dollar amounts use commas. The Airtable base has these tables:
+- Calendar Tasks (tblxLACz3bkSxnMyt): fields are Day of Month, Cadence, Property, Payment Type, Description, Owner, Status, Completed By, Completed Date
+- Properties (tbl63t0DN1HNhImZ6): fields are Property Name, Property Type, Address, City, State, Units, Square Footage, Entity Name, Acquisition Date, Acquisition Price, Current Valuation, Status, Notes
+- Users (tblyZezYKlxEOW9M5): fields are Full Name, Email, Role, Phone, Status
+Budget data is available via get_budget_summary for: 61 S Paramus (281,504 SF), Paramus Plaza (153,494 SF), 575 Broadway (178,898 SF), 1700 East Putnam (183,190 SF), 340 Mount Kemble (423,261 SF).`;
+
+    const body = {
+      model: 'claude-sonnet-4-20250514',
+      max_tokens: 1024,
+      system: sysPrompt,
+      messages: messages,
+      tools: CHAT_TOOLS
+    };
+
+    const r = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-api-key': CLAUDE_KEY,
+        'anthropic-version': '2023-06-01',
+        'anthropic-dangerous-direct-browser-access': 'true'
+      },
+      body: JSON.stringify(body)
+    });
+
+    if (!r.ok) { const e = await r.text(); throw new Error(`API ${r.status}: ${e.slice(0, 200)}`); }
+    const resp = await r.json();
+
+    // Check if tool use
+    if (resp.stop_reason === 'tool_use') {
+      const toolBlocks = resp.content.filter(b => b.type === 'tool_use');
+      const textBlocks = resp.content.filter(b => b.type === 'text');
+
+      // Show tool calls in chat
+      for (const tb of toolBlocks) {
+        chatAddMsg('bot', `<div class="tool-call">⚡ ${tb.name}</div>`);
+      }
+
+      // Execute tools
+      const toolResults = [];
+      for (const tb of toolBlocks) {
+        const result = await chatExecTool(tb.name, tb.input);
+        toolResults.push({ type: 'tool_result', tool_use_id: tb.id, content: result });
+      }
+
+      // Continue conversation
+      const newMessages = [...messages, { role: 'assistant', content: resp.content }, { role: 'user', content: toolResults }];
+      return chatCall(newMessages, depth + 1);
+    }
+
+    // Extract text
+    const text = resp.content.filter(b => b.type === 'text').map(b => b.text).join('\n');
+    return text.replace(/\n/g, '<br>');
   }
 
   // ══════════════════════════════════════
