@@ -72,15 +72,23 @@
   .period-nav button { width:32px; height:32px; border-radius:50%; border:1px solid var(--border); background:var(--surface); cursor:pointer; font-size:16px; color:var(--text-dim); display:flex; align-items:center; justify-content:center; transition:all .15s; }
   .period-nav button:hover { background:var(--surface2); color:var(--text); }
 
-  /* Summary Cards — 2 rows of 3 */
-  .summary-grid { display:grid; grid-template-columns:repeat(3,1fr); gap:16px; margin-bottom:28px; }
-  .summary-card { background:var(--surface); border:1px solid var(--border); border-radius:12px; padding:20px; text-align:center; }
-  .summary-card .value { font-size:24px; font-weight:700; margin-bottom:4px; }
+  /* Summary Sections */
+  .summary-section { margin-bottom:20px; }
+  .summary-section-header { display:flex; align-items:center; gap:8px; margin-bottom:10px; padding:0 4px; }
+  .summary-section-title { font-size:11px; font-weight:700; color:var(--text-dim); text-transform:uppercase; letter-spacing:1px; }
+  .summary-section-line { flex:1; height:1px; background:var(--border); }
+  .summary-grid { display:grid; grid-template-columns:repeat(3,1fr); gap:12px; }
+  .summary-grid.cf-grid { grid-template-columns:repeat(5,1fr); }
+  .summary-card { background:var(--surface); border:1px solid var(--border); border-radius:12px; padding:18px 12px; text-align:center; position:relative; transition:box-shadow .15s; }
+  .summary-card:hover { box-shadow:0 2px 8px rgba(0,0,0,0.06); }
+  .summary-card .value { font-size:22px; font-weight:700; margin-bottom:4px; }
   .summary-card .value.green { color:var(--green-dark); }
   .summary-card .value.red { color:var(--red-dark); }
-  .summary-card .value.orange { color:var(--orange); }
+  .summary-card .value.orange { color:#e67e22; }
+  .summary-card .label { font-size:10px; font-weight:600; color:var(--text-dim); text-transform:uppercase; letter-spacing:.5px; }
+  .summary-card.highlight { border-color:var(--accent); background:linear-gradient(135deg, #f0f7ff 0%, var(--surface) 100%); }
+  .summary-card .cf-operator { position:absolute; top:50%; right:-10px; transform:translateY(-50%); font-size:14px; font-weight:700; color:var(--text-dim); z-index:1; }
   .summary-row-label { grid-column:1/-1; font-size:11px; font-weight:600; color:var(--text-dim); text-transform:uppercase; letter-spacing:.5px; padding:4px 0 0; }
-  .summary-card .label { font-size:11px; font-weight:600; color:var(--text-dim); text-transform:uppercase; letter-spacing:.5px; }
 
   /* ── Category Sections ── */
   .cat-section { background:var(--surface); border:1px solid var(--border); border-radius:12px; padding:24px; margin-bottom:20px; }
@@ -135,6 +143,8 @@
   /* Responsive */
   @media (max-width:900px) {
     .summary-grid { grid-template-columns:repeat(2,1fr); }
+    .summary-grid.cf-grid { grid-template-columns:repeat(3,1fr); }
+    .summary-card .cf-operator { display:none; }
     header, .dashboard { padding-left:20px; padding-right:20px; }
     .txn-row { grid-template-columns:1fr 120px 100px; }
     .txn-acct { display:none; }
@@ -372,17 +382,32 @@
     </div>
   </div>
 
-  <!-- Summary Cards — Row 1: Income, OpEx, Net Income -->
-  <div class="summary-grid" id="summaryGrid">
-    <div class="summary-card"><div class="value green" id="totalIncome">—</div><div class="label">Income</div></div>
-    <div class="summary-card"><div class="value red" id="totalExpenses">—</div><div class="label">Operating Expenses</div></div>
-    <div class="summary-card"><div class="value" id="netIncome">—</div><div class="label">Net Income</div></div>
-    <!-- Row 2: Owner Distros, Investment Contributions, Loans Out, Cash Flow -->
-    <div class="summary-card"><div class="value orange" id="totalDistros">—</div><div class="label">Owner Distributions</div></div>
-    <div class="summary-card"><div class="value orange" id="totalInvest">—</div><div class="label">Investment Contributions</div></div>
-    <div class="summary-card"><div class="value orange" id="totalLoans">—</div><div class="label">Loans Out</div></div>
-    <div class="summary-card"><div class="value green" id="totalLoanPaybacks">—</div><div class="label">Loan Paybacks</div></div>
-    <div class="summary-card"><div class="value" id="cashFlow">—</div><div class="label">Cash Flow</div></div>
+  <!-- P&L Summary -->
+  <div class="summary-section">
+    <div class="summary-section-header">
+      <span class="summary-section-title">Profit & Loss</span>
+      <div class="summary-section-line"></div>
+    </div>
+    <div class="summary-grid">
+      <div class="summary-card"><div class="value green" id="totalIncome">—</div><div class="label">Income</div><span class="cf-operator">−</span></div>
+      <div class="summary-card"><div class="value red" id="totalExpenses">—</div><div class="label">Operating Expenses</div><span class="cf-operator">=</span></div>
+      <div class="summary-card highlight"><div class="value" id="netIncome">—</div><div class="label">Net Income</div></div>
+    </div>
+  </div>
+
+  <!-- Cash Flow Summary -->
+  <div class="summary-section">
+    <div class="summary-section-header">
+      <span class="summary-section-title">Cash Flow</span>
+      <div class="summary-section-line"></div>
+    </div>
+    <div class="summary-grid cf-grid">
+      <div class="summary-card"><div class="value orange" id="totalDistros">—</div><div class="label">Owner Distros</div><span class="cf-operator">−</span></div>
+      <div class="summary-card"><div class="value orange" id="totalInvest">—</div><div class="label">Investments</div><span class="cf-operator">−</span></div>
+      <div class="summary-card"><div class="value orange" id="totalLoans">—</div><div class="label">Loans Out</div><span class="cf-operator">+</span></div>
+      <div class="summary-card"><div class="value green" id="totalLoanPaybacks">—</div><div class="label">Loan Paybacks</div><span class="cf-operator">=</span></div>
+      <div class="summary-card highlight"><div class="value" id="cashFlow">—</div><div class="label">Cash Flow</div></div>
+    </div>
   </div>
 
   <!-- Income Breakdown -->
