@@ -1275,8 +1275,10 @@ function renderPeriodDashboard() {
   document.getElementById('periodTitle').textContent = period.label;
 
   // Summary cards — Row 1
+  // Show net values so Income − OpEx = Net Income adds up visually
+  // Income is already net of AM Partner Payouts, so show OpEx net of payroll reimbursements
   document.getElementById('totalIncome').textContent = fmt(comp.totalIncome);
-  document.getElementById('totalExpenses').textContent = fmt(comp.totalOpex);
+  document.getElementById('totalExpenses').textContent = fmt(Math.abs(comp.netOpex));
 
   const niEl = document.getElementById('netIncome');
   niEl.textContent = fmt(comp.netIncome);
