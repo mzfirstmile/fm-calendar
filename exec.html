@@ -1499,7 +1499,8 @@ window.addEventListener('message', function(e) {
   if (e.data.type === 'propertyNOI') {
     propertyNOI = e.data.data;
     console.log('Received NOI from parent:', propertyNOI);
-    if (bsInvestments.length) renderBalanceSheet();
+    // Re-run full loadBalanceSheet to rebuild bsInvestments with updated NOI values
+    loadBalanceSheet();
   }
   if (e.data.type === 'refreshDashboard') {
     loadData();
