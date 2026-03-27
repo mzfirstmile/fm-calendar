@@ -44,6 +44,12 @@ The embedded Claude chat has access to these tools:
 - **SMS integration:** WORKING. Telnyx send/receive deployed. Auto-reply via Claude on inbound texts + email forwarding to Morris. Deploy with `--no-verify-jwt` (Telnyx webhook has no auth header).
 - **Budget system:** Batch upload system for property budgets, GL account mapping.
 - **Accounting:** Calendar and deadline tracking imported from Google Sheets.
+- **Executive Dashboard (exec.html):** WORKING. P&L, cash flow, balance sheet, drilldowns, category overrides, investment linking all functional. Last major update 2026-03-27.
+
+## Pending / Known Issues
+- **132-40 Metropolitan NOI not showing on balance sheet:** Property exists in exec_investments but shows $0 valuation. FB_PROP_META updated in index.html code, but live site needs git push. Also `fbGlAccounts` was null when trying to recompute budget data — GL accounts may not have loaded. Budget rows DO exist in Supabase (confirmed).
+- **Investment contribution → auto-update contributed amount:** When linking a wire to an investment via dropdown, should also increment that investment's `contributed` field. Not yet implemented.
+- **Git push from sandbox not possible:** `git push` returns 403 from proxy. Morris pushes from his machine. Always commit locally and remind Morris to push.
 
 ## Email Signature (include in ALL outbound emails as HTML)
 ```html
@@ -92,12 +98,26 @@ The embedded Claude chat has access to these tools:
 - PM Fee Income and Payroll rows show NET values (display only — doesn't affect totals). PM Fee shows "Gross | Less payroll" sub-note. Payroll shows "Out | In" sub-note.
 - 132-40 Metropolitan Ave: 7.47% ownership, $400K contributed, ~$1.35M NOI, 6% cap rate
 - SQL migrations should be run via the admin website (admin.firstmilecap.com), NOT via Supabase dashboard directly
+- Category dropdown in drilldowns is grouped into sections: 💰 Income, 📋 Expenses, 📊 Balance Sheet, 🔄 Other — uses `<optgroup>` with `buildCategoryOptions()` helper
+- "Investor Contribution (Pass-Through)" removed from dropdown — everything merged into "Investment Contributions"
+- Loan Out / Deposit drilldown rows have inline editable name field (persists to `category_name` column) + category dropdown
+- Investment Contributions drilldown rows have: investment linking dropdown (links to `investment_id` on exec_transactions) + category dropdown
+- Payroll double-counting fix: PM fee bank records are already net (not gross), so split logic only tracks `payrollSplitTotal` for display-only netting — does NOT reduce income amount
+- `payrollSplits` map matches KNOWN_PAYROLL_SPLITS_BY_AMOUNT (txnAmount → splitAmount) after data loads via `matchPayrollSplits()`
+- exec.html is loaded inside an iframe in index.html — links need `target="_top"` to break out
+- NOI flows from index.html → exec.html iframe via `postMessage({ type: 'propertyNOI', data: noiMap })`
+- Balance sheet investment valuation: `(NOI / cap_rate%) × equity%` for property-linked investments
+- `FB_PROP_META` in index.html maps property IDs to names for Property Financials module
+- Hash param `#financials&prop=PropertyName` auto-navigates to that property in index.html
 
 ## Database Schema Notes
-- `exec_transactions`: main bank transaction table. Key columns: `category_override` (TEXT), `category_name` (TEXT), `investment_id` (UUID FK → exec_investments)
-- `exec_investments`: investment/asset tracking. Columns: name, ownership_pct, contributed, distributed, valuation, cap_rate, property_id (FK → properties), status
+- `exec_transactions`: main bank transaction table. Key columns: `category_override` (TEXT), `category_name` (TEXT), `investment_id` (UUID FK → exec_investments). Index: `idx_exec_txn_investment` on `investment_id`
+- `exec_investments`: investment/asset tracking. Columns: id (UUID PK), name, ownership_pct, contributed, distributed, valuation, cap_rate, property_id (FK → properties), status, membership_class, committed, unreturned_capital, net_equity
+- `exec_liabilities`: debt tracking. Columns: lender, related_deal, principal, currency, usd_equivalent, maturity_date
 - `budget_line_items`: property budgets by GL code/month
-- `properties`: property master table with Airtable record IDs as primary keys
+- `properties`: property master table with Airtable record IDs as primary keys (id, property_name, current_valuation)
+- `balance_sheet_items`: property-level balance sheet line items (property_id, bs_code, amount, account_section, account_name, is_header, is_total)
+- Migration files in `migration/` folder — run via Supabase SQL Editor
 
 ## Preferences
 - Morris works fast — keep things concise, skip unnecessary explanation
