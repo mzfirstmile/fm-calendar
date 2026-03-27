@@ -1543,7 +1543,18 @@
 
   function getViewFromHash() {
     const hash = window.location.hash.replace('#', '');
-    return hash || null;
+    // Strip query params (e.g. "financials&prop=Paramus+Plaza" → "financials")
+    return hash ? hash.split('&')[0] : null;
+  }
+
+  function getHashParam(key) {
+    const hash = window.location.hash.replace('#', '');
+    const parts = hash.split('&');
+    for (const p of parts) {
+      const [k, v] = p.split('=');
+      if (k === key && v) return decodeURIComponent(v);
+    }
+    return null;
   }
 
   // On initial load, restore view from hash if present
@@ -1553,6 +1564,17 @@
       // Replace current history entry so first back goes to previous page, not home
       history.replaceState({ view: initialView }, '', `#${initialView}`);
       switchView(initialView, false);
+      // If navigating to financials with a property name, select that property
+      if (initialView === 'financials') {
+        const propName = getHashParam('prop');
+        if (propName) {
+          fbInit().then(() => {
+            if (!bgtData) return;
+            const idx = bgtData.findIndex(b => b.name.toLowerCase() === propName.toLowerCase());
+            if (idx >= 0) fbSelectProp(idx);
+          });
+        }
+      }
     } else {
       history.replaceState({ view: 'home' }, '', window.location.pathname);
     }

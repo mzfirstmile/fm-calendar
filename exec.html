@@ -419,9 +419,9 @@
     <div class="cf-header">
       <h2>Cash Flow</h2>
       <div class="cf-toggle">
-        <button class="active" onclick="setCfMode('monthly')">Monthly</button>
+        <button onclick="setCfMode('monthly')">Monthly</button>
         <button onclick="setCfMode('quarterly')">Quarterly</button>
-        <button onclick="setCfMode('yearly')">Yearly</button>
+        <button class="active" onclick="setCfMode('yearly')">Yearly</button>
       </div>
     </div>
     <div class="cf-chart" id="cfChart"></div>
@@ -678,7 +678,7 @@ let allRecords = [];
 let categoryOverrides = {}; // recordId -> category (persisted in Supabase)
 let categoryNames = {};     // recordId -> friendly name for balance sheet display (persisted in Supabase)
 let payrollSplits = {};     // recordId -> payroll amount to deduct from PM fee
-let cfMode = 'monthly';
+let cfMode = 'yearly';
 let selectedPeriodIndex = -1; // -1 means latest
 let periods = [];
 let lastPeriodComp = null; // Store latest computePeriod result for balance sheet
@@ -2101,7 +2101,7 @@ function renderBalanceSheet() {
     invContainer.innerHTML = invCards.map(inv => {
       const ownershipDisplay = inv.ownership > 1 ? `${inv.ownership.toFixed(2)}%` : (inv.ownership > 0 ? `${(inv.ownership * 100).toFixed(2)}%` : '—');
       const linkedBadge = inv.propertyId
-        ? `<span style="display:inline-block;font-size:9px;background:var(--accent);color:#fff;padding:2px 6px;border-radius:8px;margin-left:6px;vertical-align:middle;">Linked</span>`
+        ? `<a href="index.html#financials&prop=${encodeURIComponent(inv.name)}" target="_top" onclick="event.stopPropagation();" style="display:inline-block;font-size:9px;background:var(--accent);color:#fff;padding:2px 6px;border-radius:8px;margin-left:6px;vertical-align:middle;text-decoration:none;cursor:pointer;" title="Open in Property Financials">Linked ↗</a>`
         : '';
       let valueNote = '';
       if (inv.valueSource === 'equity') {
