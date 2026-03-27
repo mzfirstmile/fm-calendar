@@ -301,26 +301,36 @@
 
     <!-- Net Position Summary -->
     <div class="bs-net-bar" id="bsNetBar">
-      <div class="bs-net-row">
-        <div class="bs-net-center">
-          <div class="bs-net-label">Net Position</div>
-          <div class="bs-net-value" id="bsNetPosition">—</div>
-        </div>
-        <div class="bs-net-divider"></div>
-        <div class="bs-net-side">
-          <div class="bs-net-label">Total Assets</div>
-          <div class="bs-net-value green" id="bsTotalAssets">—</div>
-        </div>
-        <div class="bs-net-side">
-          <div class="bs-net-label">Total Liabilities</div>
-          <div class="bs-net-value red" id="bsTotalLiabilities">—</div>
+      <!-- Loading state — shown until balance sheet is fully calculated -->
+      <div id="bsNetLoading" style="text-align:center;padding:12px 0;">
+        <div style="display:inline-flex;align-items:center;gap:8px;color:var(--text-dim);font-size:13px;">
+          <svg width="16" height="16" viewBox="0 0 16 16" style="animation:spin 1s linear infinite;"><circle cx="8" cy="8" r="6" stroke="currentColor" stroke-width="2" fill="none" stroke-dasharray="28" stroke-dashoffset="8" stroke-linecap="round"/></svg>
+          Calculating...
         </div>
       </div>
-      <div class="bs-stack-bar" id="bsStackBar"></div>
-      <div class="bs-stack-legend">
-        <span><span class="dot" style="background:var(--accent)"></span> Cash</span>
-        <span><span class="dot" style="background:var(--green)"></span> Investments</span>
-        <span><span class="dot" style="background:var(--red)"></span> Liabilities</span>
+      <!-- Actual values — hidden until ready -->
+      <div id="bsNetValues" style="display:none;">
+        <div class="bs-net-row">
+          <div class="bs-net-center">
+            <div class="bs-net-label">Net Position</div>
+            <div class="bs-net-value" id="bsNetPosition">—</div>
+          </div>
+          <div class="bs-net-divider"></div>
+          <div class="bs-net-side">
+            <div class="bs-net-label">Total Assets</div>
+            <div class="bs-net-value green" id="bsTotalAssets">—</div>
+          </div>
+          <div class="bs-net-side">
+            <div class="bs-net-label">Total Liabilities</div>
+            <div class="bs-net-value red" id="bsTotalLiabilities">—</div>
+          </div>
+        </div>
+        <div class="bs-stack-bar" id="bsStackBar"></div>
+        <div class="bs-stack-legend">
+          <span><span class="dot" style="background:var(--accent)"></span> Cash</span>
+          <span><span class="dot" style="background:var(--green)"></span> Investments</span>
+          <span><span class="dot" style="background:var(--red)"></span> Liabilities</span>
+        </div>
       </div>
     </div>
 
@@ -1554,6 +1564,12 @@ if (window.parent !== window) {
 }
 
 async function loadBalanceSheet() {
+  // Show loading state while calculating
+  const loadingEl = document.getElementById('bsNetLoading');
+  const valuesEl = document.getElementById('bsNetValues');
+  if (loadingEl) loadingEl.style.display = '';
+  if (valuesEl) valuesEl.style.display = 'none';
+
   try {
     const [inv, liab, props, bsItems] = await Promise.all([
       supaFetch('exec_investments', '?order=name.asc'),
@@ -1737,12 +1753,16 @@ function renderBalanceSheet() {
   console.log(`%c─── Investments subtotal: $${investmentsTotal.toLocaleString('en-US', {minimumFractionDigits:2})}`, 'color:#66bb6a');
   console.log(`%c═══ TOTAL ASSETS = Cash $${cash.toLocaleString('en-US', {minimumFractionDigits:2})} + Investments $${investmentsTotal.toLocaleString('en-US', {minimumFractionDigits:2})} = $${totalAssets.toLocaleString('en-US', {minimumFractionDigits:2})} ═══`, 'color:#f90;font-weight:bold;font-size:13px');
 
-  // Render summary bar
+  // Render summary bar — swap loading for values
   document.getElementById('bsTotalAssets').textContent = fmt(totalAssets);
   document.getElementById('bsTotalLiabilities').textContent = fmt(liabilitiesTotal);
   const npEl = document.getElementById('bsNetPosition');
   npEl.textContent = fmt(netPosition);
   npEl.className = 'bs-net-value ' + (netPosition >= 0 ? 'green' : 'red');
+  const loadingEl = document.getElementById('bsNetLoading');
+  const valuesEl = document.getElementById('bsNetValues');
+  if (loadingEl) loadingEl.style.display = 'none';
+  if (valuesEl) valuesEl.style.display = '';
 
   // Stacked bar
   const barTotal = cash + investmentsTotal + liabilitiesTotal;
