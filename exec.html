@@ -1069,7 +1069,7 @@ function nextPeriod() {
 
 // ── Compute period financials ──
 function computePeriod(records) {
-  let totalIncome = 0, totalOpex = 0, totalDistributions = 0, totalInvestments = 0, totalLoans = 0, totalLoanPaybacks = 0, totalDeposits = 0, payrollReimb = 0;
+  let totalIncome = 0, totalOpex = 0, totalDistributions = 0, totalInvestments = 0, totalLoans = 0, totalLoanPaybacks = 0, totalDeposits = 0, payrollReimb = 0, payrollSplitTotal = 0;
   const incomeBuckets = {};
   const opexBuckets = {};       // Operating expenses
   const distroBuckets = {};     // Owner distributions
@@ -1085,10 +1085,11 @@ function computePeriod(records) {
     const { category, type } = categorize(r);
     let amount = getAmount(r);
 
-    // NOTE: payroll splits no longer reduce PM fee income here.
-    // PM fees are shown gross. Only standalone payroll_offset transfers
-    // (from property accounts) reduce expenses via payrollReimb.
-    // This avoids double-counting where splits reduced income AND expenses.
+    // Track payroll splits for display purposes (not used in P&L math)
+    const splitAmt = payrollSplits[r.id];
+    if (splitAmt && splitAmt > 0 && category === 'income') {
+      payrollSplitTotal += splitAmt;
+    }
 
     // AM Partner Payouts: net against AM Fee Income (show as deduction, not separate distribution)
     if (category === 'distribution' && type === 'AM Partner Payout') {
@@ -1161,7 +1162,7 @@ function computePeriod(records) {
   const cashFlow = netIncome + totalDistributions + totalInvestments + totalLoans + totalDeposits + totalLoanPaybacks;
 
   return {
-    totalIncome, totalOpex: Math.abs(totalOpex), netOpex, payrollReimb,
+    totalIncome, totalOpex: Math.abs(totalOpex), netOpex, payrollReimb, payrollSplitTotal,
     totalDistributions: Math.abs(totalDistributions), totalInvestments: Math.abs(totalInvestments),
     totalLoans: Math.abs(totalLoans), totalLoanPaybacks, totalDeposits: Math.abs(totalDeposits),
     netIncome, cashFlow,
@@ -1332,18 +1333,29 @@ function renderPeriodDashboard() {
   cfEl.textContent = fmt(comp.cashFlow);
   cfEl.className = 'value ' + (comp.cashFlow >= 0 ? 'green' : 'red');
 
-  // Income rows
-  renderCategoryRows('incomeRows', comp.incomeBuckets, 'income', comp.totalIncome);
+  // Income rows — show PM Fee net of payroll splits (display only, totals unchanged)
+  const incDisplay = { ...comp.incomeBuckets };
+  if (incDisplay['Property Management Fee Income'] && comp.payrollSplitTotal > 0) {
+    const grossPM = incDisplay['Property Management Fee Income'].total;
+    const netPM = grossPM - comp.payrollSplitTotal;
+    incDisplay['Property Management Fee Income'] = {
+      ...incDisplay['Property Management Fee Income'],
+      total: netPM,
+      subNote: `Gross: ${fmtFull(grossPM)} | Less payroll: -${fmtFull(comp.payrollSplitTotal)}`
+    };
+  }
+  renderCategoryRows('incomeRows', incDisplay, 'income', comp.totalIncome);
 
-  // Operating expense rows — add payroll reimbursement into Payroll display
+  // Operating expense rows — show Payroll net of ALL reimbursements (standalone + splits)
   const opexDisplay = { ...comp.opexBuckets };
-  if (opexDisplay['Payroll'] && comp.payrollReimb > 0) {
+  const totalPayrollOffset = comp.payrollReimb + comp.payrollSplitTotal;
+  if (opexDisplay['Payroll'] && totalPayrollOffset > 0) {
     const grossPayroll = opexDisplay['Payroll'].total; // negative
-    const netPayroll = grossPayroll + comp.payrollReimb;
+    const netPayroll = grossPayroll + totalPayrollOffset;
     opexDisplay['Payroll'] = {
       ...opexDisplay['Payroll'],
       total: netPayroll,
-      subNote: `Out: ${fmtFull(grossPayroll)} | In: +${fmtFull(comp.payrollReimb)}`
+      subNote: `Out: ${fmtFull(grossPayroll)} | In: +${fmtFull(totalPayrollOffset)}`
     };
   }
   renderCategoryRows('opexRows', opexDisplay, 'expense', comp.totalOpex);
