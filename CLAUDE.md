@@ -41,7 +41,7 @@ The embedded Claude chat has access to these tools:
 
 ## Current Work / Status
 - **Email integration:** WORKING. Azure AD app registered, Graph API permissions granted (Mail.Read, Mail.Send, Mail.ReadWrite) with admin consent. Edge functions deployed. Send confirmed working 2026-03-27.
-- **SMS integration:** Telnyx-based send/receive SMS functions deployed.
+- **SMS integration:** WORKING. Telnyx send/receive deployed. Auto-reply via Claude on inbound texts + email forwarding to Morris. Deploy with `--no-verify-jwt` (Telnyx webhook has no auth header).
 - **Budget system:** Batch upload system for property budgets, GL account mapping.
 - **Accounting:** Calendar and deadline tracking imported from Google Sheets.
 

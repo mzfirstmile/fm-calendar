@@ -789,6 +789,10 @@
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 00-3-3.87"/><path d="M16 3.13a4 4 0 010 7.75"/></svg>
       <span>Users</span>
     </a>
+    <a class="sidebar-item" data-view="jobs">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+      <span>Scheduled Jobs</span>
+    </a>
   </div>
 
   <div class="sidebar-spacer"></div>
@@ -1068,6 +1072,53 @@
     </div>
   </div>
 
+  <!-- Scheduled Jobs View -->
+  <div class="manage-view" id="view-jobs" style="padding:24px 32px; overflow-y:auto; max-height:calc(100vh - 65px);">
+    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:20px;">
+      <div>
+        <h2 style="font-size:20px; font-weight:700;">Scheduled Jobs</h2>
+        <p style="font-size:13px; color:var(--text-dim); margin-top:4px;">Manage pg_cron scheduled tasks running on Supabase</p>
+      </div>
+      <button onclick="loadCronJobs()" style="padding:8px 16px; background:var(--accent); color:#fff; border:none; border-radius:8px; font-size:13px; cursor:pointer;">Refresh</button>
+    </div>
+    <div id="cronJobsContainer">
+      <p style="color:var(--text-dim); font-size:13px;">Loading...</p>
+    </div>
+    <!-- Run History Modal -->
+    <div id="cronHistoryModal" style="display:none; position:fixed; top:0; left:0; right:0; bottom:0; background:rgba(0,0,0,0.4); z-index:9999; justify-content:center; align-items:center;">
+      <div style="background:#fff; border-radius:14px; padding:28px; max-width:700px; width:90%; max-height:70vh; overflow-y:auto; box-shadow:0 20px 60px rgba(0,0,0,0.2);">
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:16px;">
+          <h3 id="cronHistoryTitle" style="font-size:16px; font-weight:700;">Run History</h3>
+          <button onclick="document.getElementById('cronHistoryModal').style.display='none'" style="background:none; border:none; font-size:20px; cursor:pointer; color:var(--text-dim);">&times;</button>
+        </div>
+        <div id="cronHistoryBody"></div>
+      </div>
+    </div>
+    <!-- Edit Schedule Modal -->
+    <div id="cronEditModal" style="display:none; position:fixed; top:0; left:0; right:0; bottom:0; background:rgba(0,0,0,0.4); z-index:9999; justify-content:center; align-items:center;">
+      <div style="background:#fff; border-radius:14px; padding:28px; max-width:420px; width:90%; box-shadow:0 20px 60px rgba(0,0,0,0.2);">
+        <h3 style="font-size:16px; font-weight:700; margin-bottom:16px;">Edit Schedule</h3>
+        <p style="font-size:12px; color:var(--text-dim); margin-bottom:8px;">Cron expression (minute hour day month weekday)</p>
+        <input id="cronEditInput" type="text" style="width:100%; padding:10px 12px; border:1px solid var(--border); border-radius:8px; font-size:14px; font-family:monospace;" placeholder="*/5 * * * *">
+        <div style="margin-top:8px;">
+          <p style="font-size:11px; color:var(--text-dim);">Presets:</p>
+          <div style="display:flex; gap:6px; flex-wrap:wrap; margin-top:4px;">
+            <button onclick="document.getElementById('cronEditInput').value='* * * * *'" style="padding:4px 10px; font-size:11px; border:1px solid var(--border); border-radius:6px; background:var(--surface2); cursor:pointer;">Every min</button>
+            <button onclick="document.getElementById('cronEditInput').value='*/5 * * * *'" style="padding:4px 10px; font-size:11px; border:1px solid var(--border); border-radius:6px; background:var(--surface2); cursor:pointer;">Every 5 min</button>
+            <button onclick="document.getElementById('cronEditInput').value='*/15 * * * *'" style="padding:4px 10px; font-size:11px; border:1px solid var(--border); border-radius:6px; background:var(--surface2); cursor:pointer;">Every 15 min</button>
+            <button onclick="document.getElementById('cronEditInput').value='0 * * * *'" style="padding:4px 10px; font-size:11px; border:1px solid var(--border); border-radius:6px; background:var(--surface2); cursor:pointer;">Hourly</button>
+            <button onclick="document.getElementById('cronEditInput').value='0 9 * * *'" style="padding:4px 10px; font-size:11px; border:1px solid var(--border); border-radius:6px; background:var(--surface2); cursor:pointer;">Daily 9am</button>
+            <button onclick="document.getElementById('cronEditInput').value='0 9 * * 1-5'" style="padding:4px 10px; font-size:11px; border:1px solid var(--border); border-radius:6px; background:var(--surface2); cursor:pointer;">Weekdays 9am</button>
+          </div>
+        </div>
+        <div style="display:flex; gap:8px; margin-top:16px; justify-content:flex-end;">
+          <button onclick="document.getElementById('cronEditModal').style.display='none'" style="padding:8px 16px; border:1px solid var(--border); border-radius:8px; background:#fff; font-size:13px; cursor:pointer;">Cancel</button>
+          <button onclick="saveCronSchedule()" style="padding:8px 16px; background:var(--accent); color:#fff; border:none; border-radius:8px; font-size:13px; cursor:pointer;">Save</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
 </div>
 
 <!-- Chat Widget -->
@@ -1222,6 +1273,7 @@
         exec: userRecord ? userRecord.access_exec === true : false,
         properties: userRecord ? userRecord.access_properties === true : false,
         users: userRecord ? (userRecord.access_users === true || userRecord.is_admin) : false,
+        jobs: userRecord ? userRecord.is_admin === true : false,
       },
     };
 
@@ -1345,7 +1397,7 @@
   function authBypass() {
     currentUser = {
       email: 'mz@firstmilecap.com', name: 'Morris Zeitouni', initials: 'MZ', isAdmin: true,
-      access: { calendar: true, financials: true, forecasting: true, exec: true, properties: true, users: true }
+      access: { calendar: true, financials: true, forecasting: true, exec: true, properties: true, users: true, jobs: true }
     };
     updateUserUI();
     applyModuleAccess();
@@ -1369,6 +1421,7 @@
     properties: 'Manage <span>Properties</span>',
     users: 'Manage <span>Users</span>',
     exec: 'Executive <span>Financials</span>',
+    jobs: 'Scheduled <span>Jobs</span>',
   };
 
   let currentView = 'home';
@@ -1410,6 +1463,7 @@
     // Load data if needed
     if (view === 'properties') loadProperties();
     if (view === 'users') loadUsers();
+    if (view === 'jobs') loadCronJobs();
     if (view === 'calendar') calInit();
     if (view === 'financials') fbInit();
     if (view === 'exec') {
@@ -1502,6 +1556,157 @@
     });
     if (!r.ok) throw new Error(`Supabase ${r.status}: ${await r.text()}`);
     return method === 'DELETE' ? null : r.json();
+  }
+
+  // ── Scheduled Jobs (pg_cron) Management ──
+  let cronEditJobId = null;
+
+  function cronHumanSchedule(cron) {
+    const presets = {
+      '* * * * *': 'Every minute',
+      '*/2 * * * *': 'Every 2 minutes',
+      '*/5 * * * *': 'Every 5 minutes',
+      '*/10 * * * *': 'Every 10 minutes',
+      '*/15 * * * *': 'Every 15 minutes',
+      '*/30 * * * *': 'Every 30 minutes',
+      '0 * * * *': 'Every hour',
+      '0 */2 * * *': 'Every 2 hours',
+      '0 */6 * * *': 'Every 6 hours',
+      '0 9 * * *': 'Daily at 9:00 AM',
+      '0 9 * * 1-5': 'Weekdays at 9:00 AM',
+      '0 0 * * *': 'Daily at midnight',
+      '0 0 * * 0': 'Weekly (Sunday midnight)',
+      '0 0 1 * *': 'Monthly (1st at midnight)',
+    };
+    return presets[cron] || cron;
+  }
+
+  async function supaRpc(fn, params = {}) {
+    const r = await fetch(`${SUPABASE_URL}/rest/v1/rpc/${fn}`, {
+      method: 'POST',
+      headers: {
+        'apikey': SUPABASE_KEY,
+        'Authorization': `Bearer ${SUPABASE_KEY}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(params),
+    });
+    if (!r.ok) throw new Error(`RPC ${fn} error: ${r.status} ${await r.text()}`);
+    return r.json();
+  }
+
+  async function loadCronJobs() {
+    const container = document.getElementById('cronJobsContainer');
+    container.innerHTML = '<p style="color:var(--text-dim); font-size:13px;">Loading...</p>';
+    try {
+      const jobs = await supaRpc('list_cron_jobs');
+      if (!jobs || jobs.length === 0) {
+        container.innerHTML = '<p style="color:var(--text-dim); font-size:13px;">No scheduled jobs found.</p>';
+        return;
+      }
+      let html = '<table style="width:100%; border-collapse:collapse; font-size:13px;">';
+      html += '<thead><tr style="border-bottom:2px solid var(--border); text-align:left;">';
+      html += '<th style="padding:10px 12px; font-weight:600; color:var(--text-dim); font-size:11px; text-transform:uppercase; letter-spacing:0.5px;">Job Name</th>';
+      html += '<th style="padding:10px 12px; font-weight:600; color:var(--text-dim); font-size:11px; text-transform:uppercase; letter-spacing:0.5px;">Schedule</th>';
+      html += '<th style="padding:10px 12px; font-weight:600; color:var(--text-dim); font-size:11px; text-transform:uppercase; letter-spacing:0.5px;">Cron</th>';
+      html += '<th style="padding:10px 12px; font-weight:600; color:var(--text-dim); font-size:11px; text-transform:uppercase; letter-spacing:0.5px;">Status</th>';
+      html += '<th style="padding:10px 12px; font-weight:600; color:var(--text-dim); font-size:11px; text-transform:uppercase; letter-spacing:0.5px;">Actions</th>';
+      html += '</tr></thead><tbody>';
+
+      for (const job of jobs) {
+        const statusColor = job.active ? 'var(--green)' : 'var(--text-dim)';
+        const statusBg = job.active ? 'var(--green-dim)' : 'var(--surface2)';
+        const statusLabel = job.active ? 'Active' : 'Paused';
+        const toggleLabel = job.active ? 'Pause' : 'Resume';
+        const toggleFn = job.active ? 'pauseCronJob' : 'resumeCronJob';
+        const name = job.jobname || `Job #${job.jobid}`;
+
+        html += `<tr style="border-bottom:1px solid var(--border);">`;
+        html += `<td style="padding:12px;">${name}</td>`;
+        html += `<td style="padding:12px; color:var(--text-dim);">${cronHumanSchedule(job.schedule)}</td>`;
+        html += `<td style="padding:12px;"><code style="background:var(--surface2); padding:2px 8px; border-radius:4px; font-size:12px;">${job.schedule}</code></td>`;
+        html += `<td style="padding:12px;"><span style="display:inline-block; padding:3px 10px; border-radius:12px; font-size:11px; font-weight:600; color:${statusColor}; background:${statusBg};">${statusLabel}</span></td>`;
+        html += `<td style="padding:12px; display:flex; gap:6px; flex-wrap:wrap;">`;
+        html += `<button onclick="${toggleFn}(${job.jobid})" style="padding:4px 12px; font-size:12px; border:1px solid var(--border); border-radius:6px; background:#fff; cursor:pointer;">${toggleLabel}</button>`;
+        html += `<button onclick="editCronSchedule(${job.jobid},'${job.schedule}')" style="padding:4px 12px; font-size:12px; border:1px solid var(--border); border-radius:6px; background:#fff; cursor:pointer;">Edit</button>`;
+        html += `<button onclick="showCronHistory(${job.jobid},'${name}')" style="padding:4px 12px; font-size:12px; border:1px solid var(--border); border-radius:6px; background:#fff; cursor:pointer;">History</button>`;
+        html += `</td></tr>`;
+      }
+      html += '</tbody></table>';
+      container.innerHTML = html;
+    } catch (e) {
+      container.innerHTML = `<p style="color:#e53e3e; font-size:13px;">Error loading jobs: ${e.message}</p>`;
+    }
+  }
+
+  async function pauseCronJob(jobid) {
+    try {
+      await supaRpc('pause_cron_job', { p_jobid: jobid });
+      loadCronJobs();
+    } catch (e) { alert('Error pausing job: ' + e.message); }
+  }
+
+  async function resumeCronJob(jobid) {
+    try {
+      await supaRpc('resume_cron_job', { p_jobid: jobid });
+      loadCronJobs();
+    } catch (e) { alert('Error resuming job: ' + e.message); }
+  }
+
+  function editCronSchedule(jobid, currentSchedule) {
+    cronEditJobId = jobid;
+    document.getElementById('cronEditInput').value = currentSchedule;
+    document.getElementById('cronEditModal').style.display = 'flex';
+  }
+
+  async function saveCronSchedule() {
+    const schedule = document.getElementById('cronEditInput').value.trim();
+    if (!schedule || !cronEditJobId) return;
+    try {
+      await supaRpc('update_cron_schedule', { p_jobid: cronEditJobId, p_schedule: schedule });
+      document.getElementById('cronEditModal').style.display = 'none';
+      loadCronJobs();
+    } catch (e) { alert('Error updating schedule: ' + e.message); }
+  }
+
+  async function showCronHistory(jobid, jobname) {
+    document.getElementById('cronHistoryTitle').textContent = `Run History — ${jobname}`;
+    document.getElementById('cronHistoryBody').innerHTML = '<p style="color:var(--text-dim); font-size:13px;">Loading...</p>';
+    document.getElementById('cronHistoryModal').style.display = 'flex';
+    try {
+      const runs = await supaRpc('cron_job_history', { p_jobid: jobid, p_limit: 20 });
+      if (!runs || runs.length === 0) {
+        document.getElementById('cronHistoryBody').innerHTML = '<p style="color:var(--text-dim); font-size:13px;">No run history yet.</p>';
+        return;
+      }
+      let html = '<table style="width:100%; border-collapse:collapse; font-size:12px;">';
+      html += '<thead><tr style="border-bottom:2px solid var(--border);">';
+      html += '<th style="padding:8px; text-align:left; font-size:11px; text-transform:uppercase; color:var(--text-dim);">Status</th>';
+      html += '<th style="padding:8px; text-align:left; font-size:11px; text-transform:uppercase; color:var(--text-dim);">Started</th>';
+      html += '<th style="padding:8px; text-align:left; font-size:11px; text-transform:uppercase; color:var(--text-dim);">Duration</th>';
+      html += '<th style="padding:8px; text-align:left; font-size:11px; text-transform:uppercase; color:var(--text-dim);">Message</th>';
+      html += '</tr></thead><tbody>';
+      for (const run of runs) {
+        const statusColor = run.status === 'succeeded' ? 'var(--green)' : '#e53e3e';
+        const started = run.start_time ? new Date(run.start_time).toLocaleString() : '-';
+        let duration = '-';
+        if (run.start_time && run.end_time) {
+          const ms = new Date(run.end_time) - new Date(run.start_time);
+          duration = ms < 1000 ? `${ms}ms` : `${(ms/1000).toFixed(1)}s`;
+        }
+        const msg = (run.return_message || '').substring(0, 80);
+        html += `<tr style="border-bottom:1px solid var(--border);">`;
+        html += `<td style="padding:8px;"><span style="color:${statusColor}; font-weight:600;">${run.status || 'unknown'}</span></td>`;
+        html += `<td style="padding:8px; color:var(--text-dim);">${started}</td>`;
+        html += `<td style="padding:8px; color:var(--text-dim);">${duration}</td>`;
+        html += `<td style="padding:8px; color:var(--text-dim); font-size:11px; max-width:200px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${msg}</td>`;
+        html += `</tr>`;
+      }
+      html += '</tbody></table>';
+      document.getElementById('cronHistoryBody').innerHTML = html;
+    } catch (e) {
+      document.getElementById('cronHistoryBody').innerHTML = `<p style="color:#e53e3e; font-size:13px;">Error: ${e.message}</p>`;
+    }
   }
 
   async function loadProperties() {
