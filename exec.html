@@ -382,7 +382,11 @@
         </div>
         <!-- Right: Cash + Loans Out + Deposits -->
         <div class="bs-assets-col">
-          <div class="bs-sub-header">Loans Out <span class="bs-sub-total" id="bsLoansOutTotal"></span></div>
+          <div class="bs-sub-header">Cash <span class="bs-sub-total" id="bsCashTotal"></span></div>
+          <div id="bsCashAccounts">
+            <p style="color:var(--text-dim);padding:8px 16px;font-size:13px;">Loading...</p>
+          </div>
+          <div class="bs-sub-header" style="margin-top:12px;">Loans Out <span class="bs-sub-total" id="bsLoansOutTotal"></span></div>
           <div id="bsLoansOut">
             <p style="color:var(--text-dim);padding:8px 16px;font-size:13px;">No outstanding loans.</p>
           </div>
@@ -2129,6 +2133,21 @@ function renderBalanceSheet() {
           </div>
         </div>`;
     }).join('');
+  }
+
+  // Render Cash accounts section
+  const cashEl = document.getElementById('bsCashAccounts');
+  const cashTotalEl = document.getElementById('bsCashTotal');
+  if (cashTotalEl) cashTotalEl.textContent = fmt(cash);
+  if (cashAccounts.length === 0) {
+    cashEl.innerHTML = '<p style="color:var(--text-dim);padding:8px 16px;font-size:13px;">No accounts found.</p>';
+  } else {
+    cashEl.innerHTML = cashAccounts.map(a => `
+      <div style="display:flex;justify-content:space-between;align-items:center;padding:6px 10px;font-size:13px;">
+        <div style="min-width:0;flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:var(--text-dim);">${a.name}</div>
+        <div style="font-weight:600;color:var(--accent);white-space:nowrap;margin-left:8px;">${fmt(a.balance)}</div>
+      </div>
+    `).join('');
   }
 
   // Render Loans Out section
