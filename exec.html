@@ -78,7 +78,7 @@
   .summary-section-title { font-size:11px; font-weight:700; color:var(--text-dim); text-transform:uppercase; letter-spacing:1px; }
   .summary-section-line { flex:1; height:1px; background:var(--border); }
   .summary-grid { display:grid; grid-template-columns:repeat(3,1fr); gap:12px; }
-  .summary-grid.cf-grid { grid-template-columns:repeat(5,1fr); }
+  .summary-grid.cf-grid { grid-template-columns:repeat(6,1fr); }
   .summary-card { background:var(--surface); border:1px solid var(--border); border-radius:12px; padding:18px 12px; text-align:center; position:relative; transition:box-shadow .15s; }
   .summary-card:hover { box-shadow:0 2px 8px rgba(0,0,0,0.06); }
   .summary-card .value { font-size:22px; font-weight:700; margin-bottom:4px; }
@@ -145,6 +145,7 @@
     .summary-grid { grid-template-columns:repeat(2,1fr); }
     .summary-grid.cf-grid { grid-template-columns:repeat(3,1fr); }
     .summary-card .cf-operator { display:none; }
+    .bs-assets-columns { grid-template-columns:1fr; }
     header, .dashboard { padding-left:20px; padding-right:20px; }
     .txn-row { grid-template-columns:1fr 120px 100px; }
     .txn-acct { display:none; }
@@ -272,6 +273,17 @@
   .bs-maturity-badge.mid { background:var(--orange-dim); color:var(--orange); }
   .bs-maturity-badge.near { background:var(--red-dim); color:var(--red-dark); }
 
+  .bs-assets-box { border:2px solid var(--green); border-radius:12px; padding:16px; margin-bottom:16px; background:rgba(76,175,80,0.03); }
+  .bs-assets-box-header { display:flex; justify-content:space-between; align-items:center; margin-bottom:12px; }
+  .bs-assets-box-title { font-size:14px; font-weight:700; color:var(--green); text-transform:uppercase; letter-spacing:.5px; }
+  .bs-assets-box-total { font-size:16px; font-weight:700; }
+  .bs-assets-columns { display:grid; grid-template-columns:1fr 1fr; gap:16px; overflow:hidden; }
+  .bs-assets-col { min-width:0; overflow:hidden; }
+  .bs-liab-box { border:2px solid var(--red); border-radius:12px; padding:16px; background:rgba(244,67,54,0.03); }
+  .bs-liab-box-header { display:flex; justify-content:space-between; align-items:center; margin-bottom:12px; }
+  .bs-liab-box-title { font-size:14px; font-weight:700; color:var(--red); text-transform:uppercase; letter-spacing:.5px; }
+  .bs-liab-box-total { font-size:16px; font-weight:700; }
+  .bs-sub-total { font-size:12px; font-weight:600; color:var(--text-dim); margin-left:auto; }
   .bs-sub-header { font-size:12px; font-weight:700; color:var(--text-dim); margin-bottom:10px; text-transform:uppercase; letter-spacing:.5px; display:flex; align-items:center; gap:8px; }
   .bs-sub-header::after { content:''; flex:1; height:1px; background:var(--border); }
 
@@ -347,21 +359,51 @@
         <div class="bs-stack-legend">
           <span><span class="dot" style="background:var(--accent)"></span> Cash</span>
           <span><span class="dot" style="background:var(--green)"></span> Investments</span>
+          <span><span class="dot" style="background:#f59e0b"></span> Loans Out</span>
+          <span><span class="dot" style="background:#8b5cf6"></span> Deposits</span>
           <span><span class="dot" style="background:var(--red)"></span> Liabilities</span>
         </div>
       </div>
     </div>
 
-    <!-- Investments -->
-    <div class="bs-sub-header">Investments <button class="bs-add-btn" onclick="openAddInvestment()">+ Add</button></div>
-    <div class="bs-grid" id="bsInvestments">
-      <div class="loading-state"><div class="spinner"></div><br>Loading…</div>
+    <!-- ASSETS wrapper -->
+    <div class="bs-assets-box">
+      <div class="bs-assets-box-header">
+        <span class="bs-assets-box-title">Assets</span>
+        <span class="bs-assets-box-total green" id="bsTotalAssetsInline"></span>
+      </div>
+      <div class="bs-assets-columns">
+        <!-- Left: Investments -->
+        <div class="bs-assets-col">
+          <div class="bs-sub-header">Investments <button class="bs-add-btn" onclick="openAddInvestment()">+ Add</button></div>
+          <div class="bs-grid" id="bsInvestments">
+            <div class="loading-state"><div class="spinner"></div><br>Loading…</div>
+          </div>
+        </div>
+        <!-- Right: Cash + Loans Out + Deposits -->
+        <div class="bs-assets-col">
+          <div class="bs-sub-header">Loans Out <span class="bs-sub-total" id="bsLoansOutTotal"></span></div>
+          <div id="bsLoansOut">
+            <p style="color:var(--text-dim);padding:8px 16px;font-size:13px;">No outstanding loans.</p>
+          </div>
+          <div class="bs-sub-header" style="margin-top:12px;">Deposits <span class="bs-sub-total" id="bsDepositsTotal"></span></div>
+          <div id="bsDeposits">
+            <p style="color:var(--text-dim);padding:8px 16px;font-size:13px;">No deposits held.</p>
+          </div>
+        </div>
+      </div>
     </div>
 
-    <!-- Liabilities -->
-    <div class="bs-sub-header">Liabilities <button class="bs-add-btn" onclick="openAddLiability()">+ Add</button></div>
-    <div id="bsLiabilities">
-      <div class="loading-state"><div class="spinner"></div><br>Loading…</div>
+    <!-- LIABILITIES wrapper -->
+    <div class="bs-liab-box">
+      <div class="bs-liab-box-header">
+        <span class="bs-liab-box-title">Liabilities</span>
+        <span class="bs-liab-box-total red" id="bsTotalLiabInline"></span>
+      </div>
+      <div class="bs-sub-header"><button class="bs-add-btn" onclick="openAddLiability()">+ Add</button></div>
+      <div id="bsLiabilities">
+        <div class="loading-state"><div class="spinner"></div><br>Loading…</div>
+      </div>
     </div>
   </div>
   </div>
@@ -412,7 +454,8 @@
     <div class="summary-grid cf-grid">
       <div class="summary-card"><div class="value orange" id="totalDistros">—</div><div class="label">Owner Distros</div><span class="cf-operator">−</span></div>
       <div class="summary-card"><div class="value orange" id="totalInvest">—</div><div class="label">Investments</div><span class="cf-operator">−</span></div>
-      <div class="summary-card"><div class="value orange" id="totalLoans">—</div><div class="label">Loans Out</div><span class="cf-operator">+</span></div>
+      <div class="summary-card"><div class="value orange" id="totalLoans">—</div><div class="label">Loans Out</div><span class="cf-operator">−</span></div>
+      <div class="summary-card"><div class="value orange" id="totalDeposits">—</div><div class="label">Deposits</div><span class="cf-operator">+</span></div>
       <div class="summary-card"><div class="value green" id="totalLoanPaybacks">—</div><div class="label">Loan Paybacks</div><span class="cf-operator">=</span></div>
       <div class="summary-card highlight"><div class="value" id="cashFlow">—</div><div class="label">Cash Flow</div></div>
     </div>
@@ -456,6 +499,14 @@
       <h3>Loans Out</h3>
     </div>
     <div id="loanRows"></div>
+  </div>
+
+  <!-- Deposits (Balance Sheet Asset) -->
+  <div class="cat-section" id="depositSection">
+    <div class="cat-section-header">
+      <h3>Deposits</h3>
+    </div>
+    <div id="depositRows"></div>
   </div>
 
   <!-- Loan Paybacks -->
@@ -589,7 +640,8 @@ const CAT_ICONS = {
   'Finders Fee': '🔍',
   'Interest Expense': '💲',
   'Loan Out': '🏦',
-  'Loan Payback': '🏦'
+  'Loan Payback': '🏦',
+  'Deposit': '🔒'
 };
 
 // All possible categories for the dropdown
@@ -599,7 +651,7 @@ const ALL_CATEGORIES = [
   'Wire Payments', 'Banking', 'Checks', 'AM Partner Payout',
   'PM Expenses', 'Software/Services', 'Other Operating',
   'Internal Transfer', 'Payroll Reimbursement', 'Investor Contribution (Pass-Through)',
-  'Travel', 'Finders Fee', 'Interest Expense', 'Loan Out', 'Loan Payback'
+  'Travel', 'Finders Fee', 'Interest Expense', 'Loan Out', 'Loan Payback', 'Deposit'
 ];
 
 // Claude API key — injected at build time by GitHub Actions
@@ -618,10 +670,12 @@ const KNOWN_PAYROLL_SPLITS = {}; // populated by matchPayrollSplits() after data
 // State
 let allRecords = [];
 let categoryOverrides = {}; // recordId -> category (persisted in Supabase)
+let categoryNames = {};     // recordId -> friendly name for balance sheet display (persisted in Supabase)
 let payrollSplits = {};     // recordId -> payroll amount to deduct from PM fee
 let cfMode = 'monthly';
 let selectedPeriodIndex = -1; // -1 means latest
 let periods = [];
+let lastPeriodComp = null; // Store latest computePeriod result for balance sheet
 
 // Auth handled by parent site's Microsoft SSO; Supabase uses anon key
 
@@ -659,6 +713,7 @@ async function loadData() {
       return includeNums.has(acctNum) || includeNames.has(acctName);
     }).map(r => {
       if (r.category_override) categoryOverrides[r.id] = r.category_override;
+      if (r.category_name) categoryNames[r.id] = r.category_name;
       return {
         id: r.id,
         fields: {
@@ -761,11 +816,13 @@ function categorize(record) {
     const isInvestment = oc === 'Investment Contributions' || oc === 'Investor Contribution (Pass-Through)';
     const isLoan = oc === 'Loan Out';
     const isLoanPayback = oc === 'Loan Payback';
+    const isDeposit = oc === 'Deposit';
     if (isExcluded) return { category: oc === 'Payroll Reimbursement' ? 'payroll_offset' : 'excluded', type: oc };
     if (isDistribution) return { category: 'distribution', type: oc };
     if (isInvestment) return { category: 'investment', type: oc };
     if (isLoan) return { category: 'loan', type: oc };
     if (isLoanPayback) return { category: 'loan_payback', type: oc };
+    if (isDeposit) return { category: 'deposit', type: oc };
     return { category: isIncome ? 'income' : 'expense', type: oc };
   }
 
@@ -847,7 +904,8 @@ function categorize(record) {
     // Billpay credits
     if (desc.includes('BILLPAY') && amount > 0) return { category: 'income', type: 'Other Income' };
 
-    // JLL
+    // JLL CAS = Asset Management Fee Income; other JLL = Other Income
+    if (desc.includes('JLL') && desc.includes('CAS') && amount > 0) return { category: 'income', type: 'Asset Management Fee Income' };
     if (desc.includes('JLL') && amount > 0) return { category: 'income', type: 'Other Income' };
 
     // Other credits
@@ -964,13 +1022,14 @@ function nextPeriod() {
 
 // ── Compute period financials ──
 function computePeriod(records) {
-  let totalIncome = 0, totalOpex = 0, totalDistributions = 0, totalInvestments = 0, totalLoans = 0, totalLoanPaybacks = 0, payrollReimb = 0;
+  let totalIncome = 0, totalOpex = 0, totalDistributions = 0, totalInvestments = 0, totalLoans = 0, totalLoanPaybacks = 0, totalDeposits = 0, payrollReimb = 0;
   const incomeBuckets = {};
   const opexBuckets = {};       // Operating expenses
   const distroBuckets = {};     // Owner distributions
   const investBuckets = {};     // Investment contributions
   const loanBuckets = {};       // Loans out (balance sheet asset)
   const loanPaybackBuckets = {}; // Loan paybacks (not operating income)
+  const depositBuckets = {};    // Deposits (balance sheet asset)
   const excludedBuckets = {};
 
   INCOME_CATEGORIES.forEach(c => incomeBuckets[c] = { total: 0, count: 0, records: [] });
@@ -1031,6 +1090,12 @@ function computePeriod(records) {
       loanPaybackBuckets[type].total += amount;
       loanPaybackBuckets[type].count++;
       loanPaybackBuckets[type].records.push(r);
+    } else if (category === 'deposit') {
+      totalDeposits += amount;
+      if (!depositBuckets[type]) depositBuckets[type] = { total: 0, count: 0, records: [] };
+      depositBuckets[type].total += amount;
+      depositBuckets[type].count++;
+      depositBuckets[type].records.push(r);
     } else if (category === 'payroll_offset') {
       payrollReimb += amount;
       if (!excludedBuckets[type]) excludedBuckets[type] = { total: 0, count: 0 };
@@ -1047,15 +1112,15 @@ function computePeriod(records) {
   const netOpex = totalOpex + payrollReimb;
   // Net Income = Income - Operating Expenses
   const netIncome = totalIncome + netOpex;
-  // Cash Flow = Net Income - Distributions - Investments - Loans Out + Loan Paybacks
-  const cashFlow = netIncome + totalDistributions + totalInvestments + totalLoans + totalLoanPaybacks;
+  // Cash Flow = Net Income - Distributions - Investments - Loans Out - Deposits + Loan Paybacks
+  const cashFlow = netIncome + totalDistributions + totalInvestments + totalLoans + totalDeposits + totalLoanPaybacks;
 
   return {
     totalIncome, totalOpex: Math.abs(totalOpex), netOpex, payrollReimb,
     totalDistributions: Math.abs(totalDistributions), totalInvestments: Math.abs(totalInvestments),
-    totalLoans: Math.abs(totalLoans), totalLoanPaybacks,
+    totalLoans: Math.abs(totalLoans), totalLoanPaybacks, totalDeposits: Math.abs(totalDeposits),
     netIncome, cashFlow,
-    incomeBuckets, opexBuckets, distroBuckets, investBuckets, loanBuckets, loanPaybackBuckets, excludedBuckets
+    incomeBuckets, opexBuckets, distroBuckets, investBuckets, loanBuckets, loanPaybackBuckets, depositBuckets, excludedBuckets
   };
 }
 
@@ -1075,7 +1140,7 @@ function renderChart() {
   const periodData = periods.map((p, i) => {
     const recs = getRecordsForPeriod(p);
     const comp = computePeriod(recs);
-    const totalOut = comp.totalOpex + comp.totalDistributions + comp.totalInvestments + comp.totalLoans;
+    const totalOut = comp.totalOpex + comp.totalDistributions + comp.totalInvestments + comp.totalLoans + comp.totalDeposits;
     return { ...p, income: comp.totalIncome, expense: totalOut, net: comp.cashFlow, netIncome: comp.netIncome, idx: i };
   });
 
@@ -1195,6 +1260,7 @@ function renderPeriodDashboard() {
   const period = periods[selectedPeriodIndex];
   const records = getRecordsForPeriod(period);
   const comp = computePeriod(records);
+  lastPeriodComp = comp;
 
   // Period title
   document.getElementById('periodTitle').textContent = period.label;
@@ -1211,6 +1277,7 @@ function renderPeriodDashboard() {
   document.getElementById('totalDistros').textContent = comp.totalDistributions > 0 ? fmt(-comp.totalDistributions) : '—';
   document.getElementById('totalInvest').textContent = comp.totalInvestments > 0 ? fmt(-comp.totalInvestments) : '—';
   document.getElementById('totalLoans').textContent = comp.totalLoans > 0 ? fmt(-comp.totalLoans) : '—';
+  document.getElementById('totalDeposits').textContent = comp.totalDeposits > 0 ? fmt(-comp.totalDeposits) : '—';
   document.getElementById('totalLoanPaybacks').textContent = comp.totalLoanPaybacks > 0 ? fmt(comp.totalLoanPaybacks) : '—';
 
   const cfEl = document.getElementById('cashFlow');
@@ -1241,6 +1308,9 @@ function renderPeriodDashboard() {
 
   // Loans out
   renderCategoryRows('loanRows', comp.loanBuckets, 'expense', comp.totalLoans);
+
+  // Deposits
+  renderCategoryRows('depositRows', comp.depositBuckets, 'expense', comp.totalDeposits);
 
   // Loan paybacks
   renderCategoryRows('loanPaybackRows', comp.loanPaybackBuckets, 'income', comp.totalLoanPaybacks);
@@ -1449,6 +1519,7 @@ function openDrilldown(type, cssClass) {
   document.getElementById('distroSection').style.display = 'none';
   document.getElementById('investSection').style.display = 'none';
   document.getElementById('loanSection').style.display = 'none';
+  document.getElementById('depositSection').style.display = 'none';
   document.getElementById('loanPaybackSection').style.display = 'none';
 }
 
@@ -1461,11 +1532,22 @@ function closeDrilldown() {
   document.getElementById('distroSection').style.display = '';
   document.getElementById('investSection').style.display = '';
   document.getElementById('loanSection').style.display = '';
+  document.getElementById('depositSection').style.display = '';
   document.getElementById('loanPaybackSection').style.display = '';
 }
 
 async function changeCategory(recordId, newCategory) {
   categoryOverrides[recordId] = newCategory;
+
+  // For Loan Out / Deposit, prompt for a friendly name for the balance sheet
+  let friendlyName = null;
+  if (newCategory === 'Loan Out' || newCategory === 'Deposit') {
+    friendlyName = prompt(`Enter a short name for this ${newCategory.toLowerCase()} (shown on Balance Sheet):`, '');
+    if (friendlyName && friendlyName.trim()) {
+      categoryNames[recordId] = friendlyName.trim();
+    }
+  }
+
   showToast(`Category → ${newCategory}`);
   renderPeriodDashboard();
   // Re-render the drilldown if it's open so recategorized items drop off
@@ -1474,12 +1556,14 @@ async function changeCategory(recordId, newCategory) {
   }
   // Persist to Supabase
   try {
-    const result = await supaWrite('exec_transactions', 'PATCH', { category_override: newCategory }, `?id=eq.${recordId}`);
+    const patchData = { category_override: newCategory };
+    if (friendlyName && friendlyName.trim()) patchData.category_name = friendlyName.trim();
+    const result = await supaWrite('exec_transactions', 'PATCH', patchData, `?id=eq.${recordId}`);
     if (!result || result.length === 0) {
-      console.error(`Category override: no rows updated for id=${recordId}. Column may not exist — run: ALTER TABLE exec_transactions ADD COLUMN IF NOT EXISTS category_override TEXT;`);
+      console.error(`Category override: no rows updated for id=${recordId}. Column may not exist — run: ALTER TABLE exec_transactions ADD COLUMN IF NOT EXISTS category_override TEXT; ALTER TABLE exec_transactions ADD COLUMN IF NOT EXISTS category_name TEXT;`);
       showToast('⚠️ Override not saved — check console', 'error');
     } else {
-      console.log(`Category override saved: ${recordId} → ${newCategory}`);
+      console.log(`Category override saved: ${recordId} → ${newCategory}${friendlyName ? ' (' + friendlyName + ')' : ''}`);
     }
   } catch(e) {
     console.error('Failed to save override:', e);
@@ -1826,7 +1910,24 @@ function renderBalanceSheet() {
     return { id: r.id, lender: r.lender || 'Unknown', deal: r.relatedDeal || '', principal: r.principal || 0, currency, usdEquiv: r.usdEquiv, maturity: r.maturity, status: r.status, notes: r.notes, usdValue };
   });
 
-  const totalAssets = cash + investmentsTotal;
+  // Compute cumulative Loans Out and Deposits from all transaction records
+  let loansOutTotal = 0;
+  let depositsTotal = 0;
+  const loanOutItems = [];
+  const depositItems = [];
+  allRecords.forEach(r => {
+    const { category, type } = categorize(r);
+    const amount = getAmount(r);
+    if (category === 'loan') {
+      loansOutTotal += Math.abs(amount);
+      loanOutItems.push({ desc: categoryNames[r.id] || getDescription(r), amount: Math.abs(amount), date: getDate(r), acct: getAccountName(r) });
+    } else if (category === 'deposit') {
+      depositsTotal += Math.abs(amount);
+      depositItems.push({ desc: categoryNames[r.id] || getDescription(r), amount: Math.abs(amount), date: getDate(r), acct: getAccountName(r) });
+    }
+  });
+
+  const totalAssets = cash + investmentsTotal + loansOutTotal + depositsTotal;
   const netPosition = totalAssets - liabilitiesTotal;
 
   // Detailed asset breakdown for debugging
@@ -1858,6 +1959,10 @@ function renderBalanceSheet() {
   // Render summary bar — swap loading for values
   document.getElementById('bsTotalAssets').textContent = fmt(totalAssets);
   document.getElementById('bsTotalLiabilities').textContent = fmt(liabilitiesTotal);
+  const bsTotalAssetsInline = document.getElementById('bsTotalAssetsInline');
+  if (bsTotalAssetsInline) bsTotalAssetsInline.textContent = fmt(totalAssets);
+  const bsTotalLiabInline = document.getElementById('bsTotalLiabInline');
+  if (bsTotalLiabInline) bsTotalLiabInline.textContent = fmt(liabilitiesTotal);
   const npEl = document.getElementById('bsNetPosition');
   npEl.textContent = fmt(netPosition);
   npEl.className = 'bs-net-value ' + (netPosition >= 0 ? 'green' : 'red');
@@ -1867,16 +1972,20 @@ function renderBalanceSheet() {
   if (valuesEl) valuesEl.style.display = '';
 
   // Stacked bar
-  const barTotal = cash + investmentsTotal + liabilitiesTotal;
+  const barTotal = cash + investmentsTotal + loansOutTotal + depositsTotal + liabilitiesTotal;
   const cashTooltipLines = cashAccounts.map(a => `${a.name}: ${fmt(a.balance)}`).join('\n');
   const cashTooltip = `Cash: ${fmt(cash)}\n─────────────\n${cashTooltipLines}`;
   if (barTotal > 0) {
     const cashPct = (cash / barTotal * 100).toFixed(1);
     const invPct = (investmentsTotal / barTotal * 100).toFixed(1);
+    const loanPct = (loansOutTotal / barTotal * 100).toFixed(1);
+    const depPct = (depositsTotal / barTotal * 100).toFixed(1);
     const liabPct = (liabilitiesTotal / barTotal * 100).toFixed(1);
     document.getElementById('bsStackBar').innerHTML =
       `<div class="bs-bar-seg bs-bar-cash" style="width:${cashPct}%;cursor:pointer;" title="${cashTooltip}"></div>` +
       `<div class="bs-bar-seg bs-bar-inv" style="width:${invPct}%" title="Investments: ${fmt(investmentsTotal)}"></div>` +
+      `<div class="bs-bar-seg" style="width:${loanPct}%;background:#f59e0b;" title="Loans Out: ${fmt(loansOutTotal)}"></div>` +
+      `<div class="bs-bar-seg" style="width:${depPct}%;background:#8b5cf6;" title="Deposits: ${fmt(depositsTotal)}"></div>` +
       `<div class="bs-bar-seg bs-bar-liab" style="width:${liabPct}%" title="Liabilities: ${fmt(liabilitiesTotal)}"></div>`;
   }
 
@@ -2020,6 +2129,42 @@ function renderBalanceSheet() {
           </div>
         </div>`;
     }).join('');
+  }
+
+  // Render Loans Out section
+  const loansOutEl = document.getElementById('bsLoansOut');
+  const loansOutTotalEl = document.getElementById('bsLoansOutTotal');
+  if (loansOutTotalEl) loansOutTotalEl.textContent = loansOutTotal > 0 ? fmt(loansOutTotal) : '';
+  if (loanOutItems.length === 0) {
+    loansOutEl.innerHTML = '<p style="color:var(--text-dim);padding:8px 16px;font-size:13px;">No outstanding loans.</p>';
+  } else {
+    loansOutEl.innerHTML = loanOutItems.map(item => `
+      <div style="display:flex;justify-content:space-between;align-items:center;padding:8px 10px;border-bottom:1px solid var(--border);font-size:13px;gap:8px;">
+        <div style="min-width:0;flex:1;">
+          <div style="font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${item.desc}</div>
+          <div style="color:var(--text-dim);font-size:11px;">${item.date.toLocaleDateString('en-US', {month:'short',day:'numeric',year:'numeric'})}</div>
+        </div>
+        <div style="font-weight:600;color:#f59e0b;white-space:nowrap;">${fmt(item.amount)}</div>
+      </div>
+    `).join('');
+  }
+
+  // Render Deposits section
+  const depositsEl = document.getElementById('bsDeposits');
+  const depositsTotalEl = document.getElementById('bsDepositsTotal');
+  if (depositsTotalEl) depositsTotalEl.textContent = depositsTotal > 0 ? fmt(depositsTotal) : '';
+  if (depositItems.length === 0) {
+    depositsEl.innerHTML = '<p style="color:var(--text-dim);padding:8px 16px;font-size:13px;">No deposits held.</p>';
+  } else {
+    depositsEl.innerHTML = depositItems.map(item => `
+      <div style="display:flex;justify-content:space-between;align-items:center;padding:8px 10px;border-bottom:1px solid var(--border);font-size:13px;gap:8px;">
+        <div style="min-width:0;flex:1;">
+          <div style="font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${item.desc}</div>
+          <div style="color:var(--text-dim);font-size:11px;">${item.date.toLocaleDateString('en-US', {month:'short',day:'numeric',year:'numeric'})}</div>
+        </div>
+        <div style="font-weight:600;color:#8b5cf6;white-space:nowrap;">${fmt(item.amount)}</div>
+      </div>
+    `).join('');
   }
 }
 

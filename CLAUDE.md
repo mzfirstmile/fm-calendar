@@ -71,6 +71,11 @@ The embedded Claude chat has access to these tools:
 - AM Partner Payouts (~$4,333/mo from FM Paramus Member account) are deductions against Asset Management Fee Income, not separate distributions — shown as "Less: AM Partner Payout" in the AM Fee drilldown
 - Email auto-reply is instant via Graph webhook (email-webhook) with 5-min cron fallback (check-inbox); dedup via atomic `replied_at` lock in auto-reply function
 - Graph webhook subscription (subscribe-inbox) expires every 3 days — needs daily cron renewal
+- "Deposit" category = balance sheet asset (not operating expense), tracked separately like Loan Out
+- "Loan Out" category = balance sheet asset, user assigns a friendly name (e.g. "Wooster loan to Ricky") shown on balance sheet instead of bank description
+- JLL CAS credits = Asset Management Fee Income (not Other Income)
+- Elyse ~$20K payments = Finders Fee (expense)
+- Balance sheet: Assets (green box) split into Investments (left) and Loans Out + Deposits (right); Liabilities (red box) below
 
 ## Preferences
 - Morris works fast — keep things concise, skip unnecessary explanation
