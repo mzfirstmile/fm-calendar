@@ -148,7 +148,8 @@
   /* ── Excluded section ── */
   .excluded-section { background:var(--surface); border:1px solid var(--border); border-radius:12px; padding:24px; margin-bottom:20px; }
   .excluded-section h3 { font-size:14px; font-weight:600; color:var(--text-dim); margin-bottom:12px; }
-  .excluded-row { display:flex; justify-content:space-between; padding:6px 0; font-size:13px; color:var(--text-dim); border-bottom:1px solid var(--border); }
+  .excluded-row { display:flex; justify-content:space-between; padding:8px 8px; margin:0 -8px; font-size:13px; color:var(--text-dim); border-bottom:1px solid var(--border); border-radius:6px; cursor:pointer; transition:background .15s; }
+  .excluded-row:hover { background:var(--surface2); color:var(--text); }
   .excluded-row:last-child { border-bottom:none; }
 
   /* ── Review Uncategorized Panel ── */
@@ -1199,13 +1200,15 @@ function computePeriod(records) {
       depositBuckets[type].records.push(r);
     } else if (category === 'payroll_offset') {
       payrollReimb += amount;
-      if (!excludedBuckets[type]) excludedBuckets[type] = { total: 0, count: 0 };
+      if (!excludedBuckets[type]) excludedBuckets[type] = { total: 0, count: 0, records: [] };
       excludedBuckets[type].total += amount;
       excludedBuckets[type].count++;
+      excludedBuckets[type].records.push(r);
     } else if (category === 'excluded') {
-      if (!excludedBuckets[type]) excludedBuckets[type] = { total: 0, count: 0 };
+      if (!excludedBuckets[type]) excludedBuckets[type] = { total: 0, count: 0, records: [] };
       excludedBuckets[type].total += amount;
       excludedBuckets[type].count++;
+      excludedBuckets[type].records.push(r);
     }
   });
 
@@ -1418,13 +1421,13 @@ function renderPeriodDashboard() {
   // Balance Sheet Transactions — merged summary rows with click-to-drilldown
   renderBsItems(comp);
 
-  // Excluded
+  // Excluded — clickable rows that open drilldowns
   const exDiv = document.getElementById('excludedRows');
   const excludedEntries = Object.entries(comp.excludedBuckets).sort((a,b) => b[1].count - a[1].count);
   const excludedCount = excludedEntries.reduce((s, [,v]) => s + v.count, 0);
   document.getElementById('excludedBadge').textContent = `(${excludedCount} transactions)`;
   exDiv.innerHTML = excludedEntries.map(([type, data]) =>
-    `<div class="excluded-row"><span>${type} (${data.count})</span><span>${fmtFull(data.total)}</span></div>`
+    `<div class="excluded-row" style="cursor:pointer;" onclick="openDrilldown('${type}', 'expense')"><span>${type} (${data.count})</span><span>${fmtFull(data.total)}</span></div>`
   ).join('');
 }
 
@@ -1746,6 +1749,7 @@ function openDrilldown(type, cssClass) {
   document.getElementById('incomeSection').style.display = 'none';
   document.getElementById('opexSection').style.display = 'none';
   document.getElementById('bsItemsSection').style.display = 'none';
+  document.querySelector('.excluded-section').style.display = 'none';
   saveStateToHash();
   // Push history so browser back button closes drilldown
   history.pushState({ drilldown: type }, '', location.hash);
@@ -1758,6 +1762,7 @@ function closeDrilldown(skipHistoryBack) {
   document.getElementById('incomeSection').style.display = '';
   document.getElementById('opexSection').style.display = '';
   document.getElementById('bsItemsSection').style.display = '';
+  document.querySelector('.excluded-section').style.display = '';
   saveStateToHash();
 }
 
