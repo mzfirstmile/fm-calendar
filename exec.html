@@ -151,6 +151,34 @@
   .excluded-row { display:flex; justify-content:space-between; padding:6px 0; font-size:13px; color:var(--text-dim); border-bottom:1px solid var(--border); }
   .excluded-row:last-child { border-bottom:none; }
 
+  /* ── Review Uncategorized Panel ── */
+  .review-panel { display:none; padding:0 40px 40px; margin:0 auto; }
+  .review-panel.show { display:block; }
+  .review-filters { display:flex; gap:8px; flex-wrap:wrap; margin-bottom:16px; }
+  .review-filter-btn { padding:6px 14px; border-radius:20px; font-size:12px; font-weight:600; border:1px solid var(--border); background:var(--surface); color:var(--text-dim); cursor:pointer; transition:all .15s; }
+  .review-filter-btn:hover { background:var(--surface2); color:var(--text); }
+  .review-filter-btn.active { background:var(--text); color:#fff; border-color:var(--text); }
+  .review-group { background:var(--surface); border:1px solid var(--border); border-radius:12px; padding:20px; margin-bottom:16px; }
+  .review-group-header { display:flex; align-items:center; justify-content:space-between; margin-bottom:12px; cursor:pointer; }
+  .review-group-header h4 { font-size:14px; font-weight:700; }
+  .review-group-header .review-group-count { font-size:12px; color:var(--text-dim); }
+  .review-group-rows { display:none; }
+  .review-group-rows.open { display:block; }
+  .review-txn { display:grid; grid-template-columns:1fr 150px 160px 100px; gap:8px; align-items:center; padding:8px 0; border-bottom:1px solid var(--border); font-size:13px; }
+  .review-txn:last-child { border-bottom:none; }
+  .review-txn .review-desc { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; cursor:help; }
+  .review-txn .review-acct { font-size:11px; color:var(--text-dim); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .review-txn .review-amt { text-align:right; font-weight:600; font-variant-numeric:tabular-nums; }
+  .review-txn .review-amt.green { color:var(--green-dark); }
+  .review-txn .review-amt.red { color:var(--red-dark); }
+  .review-back-bar { display:flex; align-items:center; justify-content:space-between; margin-bottom:20px; padding:12px 0; }
+  .review-back-bar h2 { font-size:20px; font-weight:700; }
+  @media (max-width:900px) {
+    .review-panel { padding-left:20px; padding-right:20px; }
+    .review-txn { grid-template-columns:1fr 140px 100px; }
+    .review-txn .review-acct { display:none; }
+  }
+
   /* Responsive */
   @media (max-width:900px) {
     .summary-grid { grid-template-columns:repeat(2,1fr); }
@@ -328,6 +356,7 @@
 <header id="mainHeader">
   <h1><img src="assets/favicon.png" class="logo-icon" alt="">Executive <span>Financials</span></h1>
   <div class="header-right">
+    <button class="btn" onclick="openReviewUncategorized()" id="reviewBtn" style="display:none;">⚠️ Review <span id="reviewCount" style="background:var(--red);color:#fff;padding:1px 6px;border-radius:10px;font-size:10px;margin-left:4px;">0</span></button>
     <button class="btn" onclick="refreshData()">Refresh</button>
     <a href="index.html" class="btn">Calendar</a>
   </div>
@@ -516,6 +545,16 @@
   </div>
   </div><!-- /dashboard-right -->
   </div><!-- /dashboard-grid -->
+</div>
+
+<!-- Review Uncategorized Panel -->
+<div class="review-panel" id="reviewPanel">
+  <div class="review-back-bar">
+    <h2>Review Uncategorized Transactions</h2>
+    <button class="btn" onclick="closeReviewPanel()">← Back to Dashboard</button>
+  </div>
+  <div class="review-filters" id="reviewFilters"></div>
+  <div id="reviewContent"></div>
 </div>
 
 <!-- Chat FAB + Panel -->
@@ -779,6 +818,7 @@ async function loadData() {
       selectedPeriodIndex = periods.length - 1;
     }
     renderAll();
+    updateReviewBadge();
     // Restore drilldown if one was open
     if (saved.drillType) {
       openDrilldown(saved.drillType, saved.drillCss || '');
@@ -1734,6 +1774,7 @@ async function changeCategory(recordId, newCategory) {
   }
 
   showToast(`Category → ${newCategory}`);
+  updateReviewBadge();
   renderPeriodDashboard();
   // Re-render the drilldown if it's open so recategorized items drop off
   if (currentDrilldownType) {
@@ -1859,6 +1900,190 @@ async function linkToInvestment(recordId, investmentId, selectEl) {
     }
   } catch(e) {
     console.error('Failed to save investment link:', e);
+    showToast(`⚠️ Save failed: ${e.message}`, 'error');
+  }
+}
+
+// ── Review Uncategorized ──
+// Generic/catch-all categories that indicate a transaction needs manual review
+const GENERIC_CATEGORIES = new Set([
+  'Other Income', 'Other Operating', 'Wire Payments', 'Checks',
+  'Investment Income', 'Credit Cards', 'Banking'
+]);
+
+let reviewFilterMode = 'needs-review'; // 'needs-review', 'all', or specific account name
+
+function getUncategorizedCount() {
+  // Count transactions without category_override that auto-categorize to generic buckets
+  let count = 0;
+  allRecords.forEach(r => {
+    if (!categoryOverrides[r.id]) {
+      const { type } = categorize(r);
+      if (GENERIC_CATEGORIES.has(type)) count++;
+    }
+  });
+  return count;
+}
+
+function updateReviewBadge() {
+  const count = getUncategorizedCount();
+  const btn = document.getElementById('reviewBtn');
+  const badge = document.getElementById('reviewCount');
+  if (count > 0) {
+    btn.style.display = '';
+    badge.textContent = count;
+  } else {
+    btn.style.display = 'none';
+  }
+}
+
+function openReviewUncategorized() {
+  document.getElementById('dashboard').classList.remove('show');
+  document.getElementById('reviewPanel').classList.add('show');
+  renderReviewPanel();
+}
+
+function closeReviewPanel() {
+  document.getElementById('reviewPanel').classList.remove('show');
+  document.getElementById('dashboard').classList.add('show');
+  renderPeriodDashboard();
+}
+
+function setReviewFilter(mode) {
+  reviewFilterMode = mode;
+  renderReviewPanel();
+}
+
+function renderReviewPanel() {
+  // Gather all transactions without category_override
+  const uncategorized = [];
+  allRecords.forEach(r => {
+    if (!categoryOverrides[r.id]) {
+      const { category, type } = categorize(r);
+      uncategorized.push({
+        id: r.id,
+        date: getDate(r),
+        desc: getDescription(r),
+        acct: getAccountName(r),
+        amount: getAmount(r),
+        autoCategory: type,
+        autoCatType: category,
+        isGeneric: GENERIC_CATEGORIES.has(type)
+      });
+    }
+  });
+
+  // Build filter buttons
+  const needsReviewCount = uncategorized.filter(t => t.isGeneric).length;
+  const accounts = [...new Set(uncategorized.map(t => t.acct))].sort();
+
+  let filtersHtml = `
+    <button class="review-filter-btn ${reviewFilterMode === 'needs-review' ? 'active' : ''}" onclick="setReviewFilter('needs-review')">Needs Review (${needsReviewCount})</button>
+    <button class="review-filter-btn ${reviewFilterMode === 'all' ? 'active' : ''}" onclick="setReviewFilter('all')">All Unset (${uncategorized.length})</button>
+  `;
+  accounts.forEach(acct => {
+    const acctCount = uncategorized.filter(t => t.acct === acct && (reviewFilterMode === 'needs-review' ? t.isGeneric : true)).length;
+    const shortName = acct.replace(/LLC|Operating/gi, '').trim();
+    filtersHtml += `<button class="review-filter-btn ${reviewFilterMode === acct ? 'active' : ''}" onclick="setReviewFilter('${acct.replace(/'/g, "\\'")}')">${shortName} (${acctCount})</button>`;
+  });
+  document.getElementById('reviewFilters').innerHTML = filtersHtml;
+
+  // Filter transactions
+  let filtered;
+  if (reviewFilterMode === 'needs-review') {
+    filtered = uncategorized.filter(t => t.isGeneric);
+  } else if (reviewFilterMode === 'all') {
+    filtered = uncategorized;
+  } else {
+    // Filter by account
+    filtered = uncategorized.filter(t => t.acct === reviewFilterMode);
+  }
+
+  // Group by auto-assigned category
+  const groups = {};
+  filtered.forEach(t => {
+    if (!groups[t.autoCategory]) groups[t.autoCategory] = [];
+    groups[t.autoCategory].push(t);
+  });
+
+  // Sort groups: generic categories first, then by count
+  const sortedGroups = Object.entries(groups).sort((a, b) => {
+    const aGeneric = GENERIC_CATEGORIES.has(a[0]) ? 0 : 1;
+    const bGeneric = GENERIC_CATEGORIES.has(b[0]) ? 0 : 1;
+    if (aGeneric !== bGeneric) return aGeneric - bGeneric;
+    return b[1].length - a[1].length;
+  });
+
+  if (sortedGroups.length === 0) {
+    document.getElementById('reviewContent').innerHTML = '<div style="text-align:center;padding:40px;color:var(--text-dim);">All transactions are categorized!</div>';
+    return;
+  }
+
+  let html = '';
+  sortedGroups.forEach(([catName, txns]) => {
+    const totalAmt = txns.reduce((s, t) => s + t.amount, 0);
+    const isGenericGroup = GENERIC_CATEGORIES.has(catName);
+    const icon = isGenericGroup ? '⚠️' : '✓';
+    html += `
+      <div class="review-group">
+        <div class="review-group-header" onclick="this.nextElementSibling.classList.toggle('open');this.querySelector('.review-chevron').textContent=this.nextElementSibling.classList.contains('open')?'▼':'▶'">
+          <h4>${icon} ${catName} <span class="review-chevron" style="font-size:11px;color:var(--text-dim);">▶</span></h4>
+          <div>
+            <span class="review-group-count">${txns.length} txn${txns.length !== 1 ? 's' : ''}</span>
+            <span style="margin-left:12px;font-weight:600;font-size:13px;color:${totalAmt >= 0 ? 'var(--green-dark)' : 'var(--red-dark)'}">${totalAmt >= 0 ? '+' : ''}${fmtFull(totalAmt)}</span>
+          </div>
+        </div>
+        <div class="review-group-rows">`;
+
+    // Sort by date desc
+    txns.sort((a, b) => b.date - a.date);
+    txns.forEach(t => {
+      const amtClass = t.amount >= 0 ? 'green' : 'red';
+      const amtStr = (t.amount >= 0 ? '+' : '') + fmtFull(t.amount);
+      const dateStr = t.date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+      html += `
+        <div class="review-txn">
+          <div class="review-desc" title="${t.desc}">${dateStr} — ${t.desc}</div>
+          <div class="review-acct">${t.acct}</div>
+          <select class="txn-cat-select" onchange="reviewChangeCategory('${t.id}', this.value)" style="font-size:11px;">
+            ${buildCategoryOptions(t.autoCategory)}
+          </select>
+          <div class="review-amt ${amtClass}">${amtStr}</div>
+        </div>`;
+    });
+
+    html += `</div></div>`;
+  });
+
+  document.getElementById('reviewContent').innerHTML = html;
+}
+
+async function reviewChangeCategory(recordId, newCategory) {
+  // Same as changeCategory but re-renders review panel instead of dashboard
+  categoryOverrides[recordId] = newCategory;
+
+  let friendlyName = null;
+  if (newCategory === 'Loan Out' || newCategory === 'Deposit') {
+    friendlyName = prompt(`Enter a short name for this ${newCategory.toLowerCase()} (shown on Balance Sheet):`, '');
+    if (friendlyName && friendlyName.trim()) {
+      categoryNames[recordId] = friendlyName.trim();
+    }
+  }
+
+  showToast(`Category → ${newCategory}`);
+  updateReviewBadge();
+  renderReviewPanel();
+
+  try {
+    const patchData = { category_override: newCategory };
+    if (friendlyName && friendlyName.trim()) patchData.category_name = friendlyName.trim();
+    const result = await supaWrite('exec_transactions', 'PATCH', patchData, `?id=eq.${recordId}`);
+    if (!result || result.length === 0) {
+      console.error(`Review category override: no rows updated for id=${recordId}`);
+      showToast('⚠️ Override not saved — check console', 'error');
+    }
+  } catch(e) {
+    console.error('Failed to save override:', e);
     showToast(`⚠️ Save failed: ${e.message}`, 'error');
   }
 }
