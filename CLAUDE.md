@@ -46,6 +46,14 @@ The embedded Claude chat has access to these tools:
 - **Accounting:** Calendar and deadline tracking imported from Google Sheets.
 - **Executive Dashboard (exec.html):** WORKING. P&L, cash flow, balance sheet, drilldowns, category overrides, investment linking all functional. Last major update 2026-03-27.
 
+## Monthly Financial Digest
+- **What:** Automated monthly email to Morris summarizing YTD financials — net position, net income, cash flow, P&L breakdown, balance sheet, and narrative highlights (positives + areas to watch)
+- **PDF:** Generated via `scripts/build_monthly_digest.py` using reportlab — 3 pages: executive summary + P&L, balance sheet + cash flow, footer
+- **Email:** Sent via send-email edge function to mz@firstmilecap.com with HTML summary + PDF attachment
+- **Timing:** Run after Morris closes the books each month (not on a fixed schedule yet — triggered manually or via scheduled task)
+- **Attachment support:** send-email edge function updated locally to accept `attachments` array (each: `{name, contentType, contentBytes}` where contentBytes is base64). Needs `supabase functions deploy send-email` to go live.
+- **Test email sent:** 2026-03-29 (HTML only, no attachment — attachment support not yet deployed)
+
 ## Pending / Known Issues
 - **132-40 Metropolitan NOI not showing on balance sheet:** Property exists in exec_investments but shows $0 valuation. FB_PROP_META updated in index.html code, but live site needs git push. Also `fbGlAccounts` was null when trying to recompute budget data — GL accounts may not have loaded. Budget rows DO exist in Supabase (confirmed).
 - **Investment contribution → auto-update contributed amount:** When linking a wire to an investment via dropdown, should also increment that investment's `contributed` field. Not yet implemented.

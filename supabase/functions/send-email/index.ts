@@ -51,7 +51,7 @@ serve(async (req: Request) => {
   }
 
   try {
-    const { to, cc, subject, body, bodyType, sentBy } = await req.json();
+    const { to, cc, subject, body, bodyType, sentBy, attachments } = await req.json();
 
     // Validate required fields
     if (!to || !subject || !body) {
@@ -77,7 +77,7 @@ serve(async (req: Request) => {
       : [];
 
     // Build Graph API payload
-    const message = {
+    const message: any = {
       subject,
       body: {
         contentType: bodyType === "text" ? "Text" : "HTML",
@@ -86,6 +86,17 @@ serve(async (req: Request) => {
       toRecipients,
       ccRecipients,
     };
+
+    // Add attachments if provided
+    // Each attachment: { name: "file.pdf", contentType: "application/pdf", contentBytes: "<base64>" }
+    if (attachments && Array.isArray(attachments) && attachments.length > 0) {
+      message.attachments = attachments.map((a: any) => ({
+        "@odata.type": "#microsoft.graph.fileAttachment",
+        name: a.name,
+        contentType: a.contentType || "application/octet-stream",
+        contentBytes: a.contentBytes,
+      }));
+    }
 
     const token = await getGraphToken();
 
