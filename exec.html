@@ -945,10 +945,12 @@ function categorize(record) {
     const absAmt = Math.abs(amount);
     const isPayrollReimb = PAYROLL_REIMB_AMOUNTS.some(a => Math.abs(absAmt - a) < PAYROLL_REIMB_TOLERANCE);
     if (isPayrollReimb) return { category: 'payroll_offset', type: 'Payroll Reimbursement' };
+    // Credits into Management = PM Fee Income (not internal transfer)
+    if (amount > 0) return { category: 'income', type: 'Property Management Fee Income' };
     return { category: 'excluded', type: 'Internal Transfer' };
   }
 
-  // PM Fees — credits in Management account
+  // PM Fees — credits in Management account (non-transfers)
   if ((acctName.toUpperCase().includes('MANAGEMENT') || acctName.toUpperCase().includes('FIRST MILE MANAGEMENT')) && amount > 0 && !isTransfer) {
     return { category: 'income', type: 'Property Management Fee Income' };
   }

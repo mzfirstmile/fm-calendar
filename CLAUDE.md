@@ -86,6 +86,7 @@ The embedded Claude chat has access to these tools:
 ## Business Logic & Domain Knowledge
 *(Things that live in Morris's head, not in the code — add here as we learn them)*
 - Payroll reimbursements are structured as deductions to the property management fee (not separate line items)
+- Credits (incoming) to First Mile Management LLC account = Property Management Fee Income, even if they're account transfers. Only outgoing transfers from Management are Internal Transfers.
 - ~$4M in FM Capital SAVINGS account is investor capital held for deployment (Six Fields loan for Lifetime AZ) — NOT discretionary FM cash. Will be deployed into an asset soon. Operating cash is only ~$346K across other accounts.
 - ReWyre (Rasheq Zarif salary, ~$104K) is an asset on books — salary advance/investment
 - Biweekly payroll reimbursement transfers (~$16,287, $20,200, $19,939, $2,011.36) between management and main accounts are categorized as "Payroll Reimbursement" — known amounts in PAYROLL_REIMB_AMOUNTS array with $5 tolerance matching
