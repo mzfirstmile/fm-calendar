@@ -3262,7 +3262,7 @@ You have your own phone number: +1 (866) 568-4445. You can send and search SMS m
           <div class="fb-card-name">${p.name}</div>
         </div>
         <div class="fb-card-body">
-          <div class="fb-card-meta">${p.sqft ? p.sqft.toLocaleString() + ' SF' : ''}${p.closeDate ? (p.sqft ? ' · ' : '') + 'Closed ' + new Date(p.closeDate + 'T00:00:00').toLocaleDateString('en-US', {month:'short', year:'numeric'}) : ''}</div>
+          <div class="fb-card-meta">${p.closeDate ? 'Closed ' + new Date(p.closeDate + 'T00:00:00').toLocaleDateString('en-US', {month:'short', year:'numeric'}) : ''}</div>
           <div class="fb-card-metrics" style="grid-template-columns:1fr 1fr 1fr;">
             <div class="fb-card-metric">
               <div class="fb-card-metric-label">Revenue</div>
