@@ -4333,7 +4333,14 @@ async function saveManualAsset(assetType) {
 </script>
 <script>
 if (window.parent !== window) {
-  document.getElementById('mainHeader').style.display = 'none';
+  // In iframe: hide full header but show a compact action bar with Upload/Review/Refresh
+  const hdr = document.getElementById('mainHeader');
+  hdr.style.padding = '8px 20px';
+  hdr.style.borderBottom = 'none';
+  hdr.style.background = 'transparent';
+  // Hide title, keep action buttons
+  const h1 = hdr.querySelector('h1');
+  if (h1) h1.style.display = 'none';
   // Hide chat in iframe — parent site has its own chat widget
   const fab = document.getElementById('chatFab');
   const panel = document.getElementById('chatPanel');
