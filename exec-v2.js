@@ -12,7 +12,23 @@ function _injectCSS() {
   const style = document.createElement('style');
   style.textContent = `
   
-  #exec2Root { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: var(--bg); color: var(--text); min-height: 100vh; }
+  #exec2Root {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    background: var(--bg); color: var(--text); min-height: 100vh;
+    /* Color variables matching exec.html */
+    --green: #2ecc71;
+    --green-dark: #1a9a55;
+    --green-dim: rgba(46,204,113,0.10);
+    --red: #e74c3c;
+    --red-dark: #c0392b;
+    --red-dim: rgba(231,76,60,0.08);
+    --orange: #d4860a;
+    --orange-dim: rgba(212,134,10,0.08);
+    --accent: #00b0d4;
+    --accent-dim: rgba(0,176,212,0.08);
+    --income-bar: #d4edda;
+    --expense-bar: #f8d7da;
+  }
 
   .loading-bar { height:3px; background:var(--accent); position:fixed; top:0; left:0; width:0; transition:width .3s; z-index:500; }
   .loading-bar.active { width:60%; }
@@ -402,16 +418,12 @@ function _injectHTML() {
 
 
 
-<!-- Dashboard -->
-<header id="mainHeader">
-  <h1><img src="assets/favicon.png" class="logo-icon" alt="">Executive <span>Financials</span></h1>
-  <div class="header-right">
+<!-- Action bar (no header — parent topbar provides title) -->
+<div id="mainHeader" style="display:flex;justify-content:flex-end;align-items:center;padding:12px 24px 0;gap:8px;">
     <button class="btn accent" onclick="openUploadModal()">📤 Upload Transactions</button>
     <button class="btn" onclick="openReviewUncategorized()" id="reviewBtn" style="display:none;">⚠️ Review <span id="reviewCount" style="background:var(--red);color:#fff;padding:1px 6px;border-radius:10px;font-size:10px;margin-left:4px;">0</span></button>
     <button class="btn" onclick="refreshData()">Refresh</button>
-    <a href="index.html" class="btn">Calendar</a>
-  </div>
-</header>
+</div>
 
 <div class="dashboard" id="dashboard">
   <div class="dashboard-grid">
@@ -895,7 +907,11 @@ async function loadData() {
       const idx = periods.findIndex(p => p.label === saved.periodLabel);
       selectedPeriodIndex = idx >= 0 ? idx : periods.length - 1;
     } else {
-      selectedPeriodIndex = periods.length - 1;
+      // Default to current month (or latest available if current month has no data)
+      const now = new Date();
+      const curLabel = now.toLocaleString('en-US', { month: 'long' }) + ' ' + now.getFullYear();
+      const curIdx = periods.findIndex(p => p.label === curLabel);
+      selectedPeriodIndex = curIdx >= 0 ? curIdx : periods.length - 1;
     }
     renderAll();
     updateReviewBadge();
@@ -3320,24 +3336,36 @@ async function fetchNOIFromBudget() {
 
 // Request NOI — deferred until after init injects HTML
 function _initNOI() {
-  if (isInIframe) {
-    try { window.propertyNOI = getParentNOI(); } catch(e) {}
-    setTimeout(async () => {
-      if (!noiReceived) {
-        propertyNOI = await fetchNOIFromBudget();
-        noiReceived = true;
-        console.log('Fetched NOI directly from budget:', propertyNOI);
+  // Native module: try parent's bgtData first (same data source as v1)
+  if (window.bgtData && window.bgtData.length > 0) {
+    const noiMap = {};
+    window.bgtData.forEach(p => { if (p.noi) noiMap[p.id] = p.noi; });
+    propertyNOI = noiMap;
+    noiReceived = true;
+    console.log('Using parent bgtData for NOI:', propertyNOI);
+    return; // loadBalanceSheet will be called by loadData
+  }
+  // Fallback: fetch from budget_line_items if bgtData not ready yet
+  fetchNOIFromBudget().then(noi => {
+    propertyNOI = noi;
+    noiReceived = true;
+    console.log('Fetched NOI from budget_line_items:', propertyNOI);
+    loadBalanceSheet();
+  });
+  // Also listen for bgtData becoming available later
+  const checkInterval = setInterval(() => {
+    if (window.bgtData && window.bgtData.length > 0) {
+      clearInterval(checkInterval);
+      const noiMap = {};
+      window.bgtData.forEach(p => { if (p.noi) noiMap[p.id] = p.noi; });
+      if (JSON.stringify(noiMap) !== JSON.stringify(propertyNOI)) {
+        propertyNOI = noiMap;
+        console.log('Updated NOI from parent bgtData:', propertyNOI);
         loadBalanceSheet();
       }
-    }, 3000);
-  } else {
-    fetchNOIFromBudget().then(noi => {
-      propertyNOI = noi;
-      noiReceived = true;
-      console.log('Fetched NOI directly from budget (standalone):', propertyNOI);
-      loadBalanceSheet();
-    });
-  }
+    }
+  }, 1000);
+  setTimeout(() => clearInterval(checkInterval), 15000); // stop checking after 15s
 }
 
 async function loadBalanceSheet() {
