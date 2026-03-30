@@ -53,7 +53,7 @@ The embedded Claude chat has access to these tools:
 - **Timing:** Run after Morris closes the books each quarter (Q1–Q4). Not on a fixed schedule — triggered manually or via scheduled task.
 - **Output:** Saved to `~/First Mile Dropbox/Morris Zeitouni/FM Quarterly Reports/` (falls back to `reports/` in workspace). `reports/` is gitignored.
 - **Attachment support:** send-email edge function updated locally to accept `attachments` array (each: `{name, contentType, contentBytes}` where contentBytes is base64). Needs `supabase functions deploy send-email` to go live.
-- **Test email sent:** 2026-03-29 (Q1 test, HTML only — attachment support not yet deployed)
+- **Test email sent:** 2026-03-29 (Q1 test WITH PDF attachment — confirmed working via send-email edge function)
 - **Cash note:** ~$4M in SAVINGS account is investor capital held for deployment (Six Fields/Lifetime AZ loan), NOT discretionary FM cash. Operating cash is only ~$346K. Report calls this out explicitly.
 - **Other Assets:** ReWyre (Rasheq Zarif salary, ~$104K) tracked as asset on books
 - **NOI dependency:** Balance sheet investment valuations depend on NOI data from budget module. exec.html now waits for NOI before showing net position (no more flash of wrong -$4M number).
