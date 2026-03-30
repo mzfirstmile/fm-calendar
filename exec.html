@@ -1842,11 +1842,17 @@ function openDrilldown(type, cssClass) {
 
         let linkHtml = '';
         if (isLinkableIncome && d.recordId) {
-          // Property dropdown for fee income
+          // Combined Property + Investment dropdown for fee income (deduped by name)
           const currentPropId = propertyLinks[d.recordId] || '';
-          const propOpts = [`<option value="">— Property —</option>`];
-          bsProperties.forEach(p => { propOpts.push(`<option value="${p.id}" ${p.id === currentPropId ? 'selected' : ''}>${p.property_name}</option>`); });
-          linkHtml = `<select class="txn-cat-select" style="max-width:130px;font-size:10px;" onchange="linkToProperty('${d.recordId}', this.value)">${propOpts.join('')}</select>`;
+          const currentInvId = investmentLinks[d.recordId] || '';
+          const seenNames = new Set();
+          let optsHtml = `<option value="">— Property / Investment —</option>`;
+          optsHtml += `<optgroup label="Properties">`;
+          bsProperties.forEach(p => { seenNames.add(p.property_name.toLowerCase()); optsHtml += `<option value="prop:${p.id}" ${p.id === currentPropId ? 'selected' : ''}>${p.property_name}</option>`; });
+          optsHtml += `</optgroup><optgroup label="Investments">`;
+          bsInvestments.forEach(inv => { if (!seenNames.has((inv.name||'').toLowerCase())) optsHtml += `<option value="inv:${inv.id}" ${inv.id === currentInvId ? 'selected' : ''}>${inv.name}</option>`; });
+          optsHtml += `</optgroup>`;
+          linkHtml = `<select class="txn-cat-select" style="max-width:130px;font-size:10px;" onchange="linkToPropOrInv('${d.recordId}', this.value)">${optsHtml}</select>`;
         } else if (isInvestmentIncome && d.recordId) {
           // Investment dropdown for investment income (to track distributions)
           const linkedInvId = investmentLinks[d.recordId] || '';
@@ -2062,6 +2068,34 @@ async function linkToProperty(recordId, propertyId) {
   } catch(e) {
     console.error('Failed to save property link:', e);
     showToast(`⚠️ Save failed: ${e.message}`, 'error');
+  }
+}
+
+// Combined property/investment linker — value format: "prop:ID" or "inv:ID"
+async function linkToPropOrInv(recordId, value) {
+  if (!value) {
+    delete propertyLinks[recordId];
+    delete investmentLinks[recordId];
+    showToast('Unlinked');
+    if (currentDrilldownType) openDrilldown(currentDrilldownType, currentDrilldownCssClass);
+    try { await supaWrite('exec_transactions', 'PATCH', { property_id: null, investment_id: null }, `?id=eq.${recordId}`); } catch(e) { showToast(`⚠️ Save failed`, 'error'); }
+    return;
+  }
+  const [type, id] = value.split(':');
+  if (type === 'prop') {
+    propertyLinks[recordId] = id;
+    delete investmentLinks[recordId];
+    const name = (bsProperties.find(p => p.id === id) || {}).property_name || id;
+    showToast(`Linked → ${name}`);
+    if (currentDrilldownType) openDrilldown(currentDrilldownType, currentDrilldownCssClass);
+    try { await supaWrite('exec_transactions', 'PATCH', { property_id: id, investment_id: null }, `?id=eq.${recordId}`); } catch(e) { showToast(`⚠️ Save failed`, 'error'); }
+  } else if (type === 'inv') {
+    investmentLinks[recordId] = id;
+    delete propertyLinks[recordId];
+    const name = (bsInvestments.find(i => i.id === id) || {}).name || id;
+    showToast(`Linked → ${name}`);
+    if (currentDrilldownType) openDrilldown(currentDrilldownType, currentDrilldownCssClass);
+    try { await supaWrite('exec_transactions', 'PATCH', { investment_id: id, property_id: null }, `?id=eq.${recordId}`); } catch(e) { showToast(`⚠️ Save failed`, 'error'); }
   }
 }
 
@@ -2697,7 +2731,7 @@ function getReviewItems() {
     const id = r.id;
     const effectiveCat = categoryOverrides[id] || categorize(r).type;
     const isGeneric = !categoryOverrides[id] && GENERIC_CATEGORIES.has(effectiveCat);
-    const needsPropLink = LINKABLE_TO_PROPERTY.has(effectiveCat) && !propertyLinks[id];
+    const needsPropLink = LINKABLE_TO_PROPERTY.has(effectiveCat) && !propertyLinks[id] && !investmentLinks[id];
     const needsInvLink = LINKABLE_TO_INVESTMENT.has(effectiveCat) && !investmentLinks[id];
     const needsLiabLink = LINKABLE_TO_LIABILITY.has(effectiveCat) && !liabilityLinks[id];
     const needsLink = needsPropLink || needsInvLink || needsLiabLink;
@@ -2838,9 +2872,15 @@ function toggleReviewGroup(catName, headerEl) {
 function buildReviewLinkDropdown(recordId, category) {
   // Returns HTML for the appropriate linking dropdown based on category
   if (LINKABLE_TO_PROPERTY.has(category)) {
-    const propOpts = [`<option value="">— Property —</option>`];
-    bsProperties.forEach(p => { propOpts.push(`<option value="${p.id}">${p.property_name}</option>`); });
-    return `<select class="txn-cat-select review-link" onchange="reviewLinkProperty('${recordId}', this.value)">${propOpts.join('')}</select>`;
+    // Combined Property + Investment dropdown (deduped by name)
+    const seenNames = new Set();
+    let optsHtml = `<option value="">— Property / Investment —</option>`;
+    optsHtml += `<optgroup label="Properties">`;
+    bsProperties.forEach(p => { seenNames.add(p.property_name.toLowerCase()); optsHtml += `<option value="prop:${p.id}">${p.property_name}</option>`; });
+    optsHtml += `</optgroup><optgroup label="Investments">`;
+    bsInvestments.forEach(inv => { if (!seenNames.has((inv.name||'').toLowerCase())) optsHtml += `<option value="inv:${inv.id}">${inv.name}</option>`; });
+    optsHtml += `</optgroup>`;
+    return `<select class="txn-cat-select review-link" onchange="reviewLinkPropOrInv('${recordId}', this.value)">${optsHtml}</select>`;
   } else if (LINKABLE_TO_INVESTMENT.has(category)) {
     const invOpts = [`<option value="">— Investment —</option>`];
     bsInvestments.forEach(inv => { invOpts.push(`<option value="${inv.id}">${inv.name}</option>`); });
@@ -2871,6 +2911,25 @@ async function reviewChangeCategory(recordId, newCategory) {
     const result = await supaWrite('exec_transactions', 'PATCH', patchData, `?id=eq.${recordId}`);
     if (!result || result.length === 0) showToast('⚠️ Override not saved', 'error');
   } catch(e) { console.error('Failed to save override:', e); showToast(`⚠️ Save failed: ${e.message}`, 'error'); }
+}
+
+async function reviewLinkPropOrInv(recordId, value) {
+  if (!value) {
+    delete propertyLinks[recordId]; delete investmentLinks[recordId];
+    showToast('Unlinked'); updateReviewBadge();
+    try { await supaWrite('exec_transactions', 'PATCH', { property_id: null, investment_id: null }, `?id=eq.${recordId}`); } catch(e) { showToast(`⚠️ Save failed`, 'error'); }
+    return;
+  }
+  const [type, id] = value.split(':');
+  if (type === 'prop') {
+    propertyLinks[recordId] = id; delete investmentLinks[recordId];
+    showToast('Linked to property'); updateReviewBadge();
+    try { await supaWrite('exec_transactions', 'PATCH', { property_id: id, investment_id: null }, `?id=eq.${recordId}`); } catch(e) { showToast(`⚠️ Save failed`, 'error'); }
+  } else if (type === 'inv') {
+    investmentLinks[recordId] = id; delete propertyLinks[recordId];
+    showToast('Linked to investment'); updateReviewBadge();
+    try { await supaWrite('exec_transactions', 'PATCH', { investment_id: id, property_id: null }, `?id=eq.${recordId}`); } catch(e) { showToast(`⚠️ Save failed`, 'error'); }
+  }
 }
 
 async function reviewLinkProperty(recordId, propertyId) {
