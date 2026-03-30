@@ -3671,11 +3671,12 @@ function renderBalanceSheet() {
 
   // Render liability cards
   const liabContainer = document.getElementById('bsLiabilities');
-  if (liabCards.length === 0) {
+  const activeLiabs = liabCards.filter(l => l.usdValue > 0 || l.principal > 0);
+  if (activeLiabs.length === 0) {
     liabContainer.innerHTML = '<p style="color:var(--text-dim);padding:16px;text-align:center;">No liabilities found.</p>';
   } else {
-    liabCards.sort((a, b) => b.usdValue - a.usdValue);
-    liabContainer.innerHTML = liabCards.map(l => {
+    activeLiabs.sort((a, b) => b.usdValue - a.usdValue);
+    liabContainer.innerHTML = activeLiabs.map(l => {
       const currName = typeof l.currency === 'object' ? l.currency.name : l.currency;
       const isJpy = currName === 'JPY';
       let amtStr;
@@ -3755,10 +3756,11 @@ function renderBalanceSheet() {
   const loansOutEl = document.getElementById('bsLoansOut');
   const loansOutTotalEl = document.getElementById('bsLoansOutTotal');
   if (loansOutTotalEl) loansOutTotalEl.textContent = loansOutTotal > 0 ? fmt(loansOutTotal) : '';
-  if (consolidatedLoans.length === 0) {
+  const activeLoanOuts = consolidatedLoans.filter(item => item.netAmount > 0);
+  if (activeLoanOuts.length === 0) {
     loansOutEl.innerHTML = '<p style="color:var(--text-dim);padding:8px 16px;font-size:13px;">No outstanding loans.</p>';
   } else {
-    loansOutEl.innerHTML = consolidatedLoans.map((item, idx) => {
+    loansOutEl.innerHTML = activeLoanOuts.map((item, idx) => {
       const countNote = item.count > 1 ? ` (${item.count} txns)` : '';
       const paybackNote = item.payback > 0 ? `<div style="color:var(--green-dark);font-size:10px;">Payback: -${fmt(item.payback)} → Net: ${fmt(item.netAmount)}</div>` : '';
       const ids = item.recordIds.join(',');
