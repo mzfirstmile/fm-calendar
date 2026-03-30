@@ -78,10 +78,10 @@ The embedded Claude chat has access to these tools:
 - **Account mapping:** ACCOUNT_NAME_MAP in exec.html maps account numbers to names (includes Pref Fund I: 483103381654, etc.)
 
 ## Pending / Known Issues
-- **132-40 Metropolitan NOI not showing on balance sheet:** Property exists in exec_investments but shows $0 valuation. FB_PROP_META updated in index.html code, but live site needs git push. Also `fbGlAccounts` was null when trying to recompute budget data — GL accounts may not have loaded. Budget rows DO exist in Supabase (confirmed).
+- **132-40 Metropolitan NOI not showing on balance sheet:** Property exists in exec_investments but shows $0 valuation. FB_PROP_META updated in index.html code, but live site needs git push. Also `fbGlAccounts` was null when trying to recompute budget data — GL accounts may not have loaded. Budget rows DO exist in Supabase (confirmed). **UPDATE 2026-03-30:** Budget data (2026+2027) seeded via `migration/seed-metropolitan-budget.sql`. NOI corrected to exclude RET (Real Estate Tax Recovery) pass-throughs: 2026 NOI = $1,124,216 ($93,684.70/mo), 2027 NOI = $1,012,323 ($84,360.21/mo). RET is tenant reimbursement that offsets RE Tax expense — not real income.
 - **Investment contribution → auto-update contributed amount:** When linking a wire to an investment via dropdown, should also increment that investment's `contributed` field. Not yet implemented.
 - **Net Position line chart (quarterly snapshot):** Once quarterly books are officially closed, create a snapshot of balance sheet net position so we can build a line chart tracking net position over time (same style as the existing net income line chart). Needs a DB table for quarterly snapshots (e.g. `exec_quarterly_snapshots` with columns: quarter, year, net_position, total_assets, total_liabilities, net_income, snapshot_date).
-- **Cash flow chart should show Net Income P&L:** The "cash flow" line chart on exec.html currently shows net cash flow — Morris wants it to show Net Income (P&L) instead. Update the chart data source when implementing.
+- **~~Cash flow chart should show Net Income P&L~~:** DONE 2026-03-30. Chart now shows Net Income (P&L) — revenue bars, opex bars, cumulative net income line. Changed from cash flow which included balance sheet items.
 - **Git push from sandbox not possible:** `git push` returns 403 from proxy. Morris pushes from his machine. Always commit locally and remind Morris to push.
 
 ## Email Signature (include in ALL outbound emails as HTML)
@@ -133,7 +133,8 @@ The embedded Claude chat has access to these tools:
 - Browser back button closes drilldown (uses History API pushState/popstate)
 - Linked investments show subtle ↗ arrow icon (not "Linked" text badge) — clicking navigates to Property Financials module via `target="_top"` (breaks out of iframe)
 - PM Fee Income and Payroll rows show NET values (display only — doesn't affect totals). PM Fee shows "Gross | Less payroll" sub-note. Payroll shows "Out | In" sub-note.
-- 132-40 Metropolitan Ave: 7.47% ownership, $400K contributed, ~$1.35M NOI, 6% cap rate
+- 132-40 Metropolitan Ave: 7.47% ownership, $400K contributed, ~$1.12M NOI (excl RET pass-throughs), 6% cap rate
+- RET (Real Estate Tax Recovery) is a pass-through — tenants reimburse RE tax, so it offsets the expense. Exclude from NOI calculations (GL 4120). Same principle for Insurance Recovery (4130) and W/S Recovery (4140) if material.
 - SQL migrations should be run via the admin website (admin.firstmilecap.com), NOT via Supabase dashboard directly
 - Category dropdown in drilldowns is grouped into sections: 💰 Income, 📋 Expenses, 📊 Balance Sheet, 🔄 Other — uses `<optgroup>` with `buildCategoryOptions()` helper
 - "Investor Contribution (Pass-Through)" removed from dropdown — everything merged into "Investment Contributions"

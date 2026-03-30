@@ -517,10 +517,10 @@
 
   <!-- RIGHT: Cash Flow & Period Details -->
   <div class="dashboard-right">
-  <!-- Cash Flow Chart -->
+  <!-- Net Income Chart -->
   <div class="cf-section">
     <div class="cf-header">
-      <h2>Cash Flow</h2>
+      <h2>Net Income</h2>
       <div class="cf-toggle">
         <button onclick="setCfMode('monthly')">Monthly</button>
         <button onclick="setCfMode('quarterly')">Quarterly</button>
@@ -1356,20 +1356,19 @@ function renderAll() {
   renderPeriodDashboard();
 }
 
-// ── Render Cash Flow Chart ──
+// ── Render Net Income (P&L) Chart ──
 function renderChart() {
   const container = document.getElementById('cfChart');
   if (periods.length === 0) { container.innerHTML = '<p style="color:var(--text-dim);text-align:center;padding:40px;">No data</p>'; return; }
 
-  // Compute net cash flow per period
+  // Compute net income per period
   const periodData = periods.map((p, i) => {
     const recs = getRecordsForPeriod(p);
     const comp = computePeriod(recs, p);
-    const totalOut = comp.totalOpex + comp.totalDistributions + comp.totalInvestments + comp.totalLoans + comp.totalDeposits;
-    return { ...p, income: comp.totalIncome, expense: totalOut, net: comp.cashFlow, netIncome: comp.netIncome, idx: i };
+    return { ...p, income: comp.totalIncome, expense: comp.totalOpex, net: comp.netIncome, idx: i };
   });
 
-  // Cumulative line
+  // Cumulative net income line
   let cumulative = 0;
   periodData.forEach(p => { cumulative += p.net; p.cumulative = cumulative; });
 
@@ -1422,7 +1421,7 @@ function renderChart() {
     }
   });
 
-  // Bars — income (green, above zero) and expense (red, below zero)
+  // Bars — revenue (green, above zero) and operating expenses (red, below zero)
   periodData.forEach((p, i) => {
     const cx = padL + i * gap + gap / 2;
     const selected = i === selectedPeriodIndex;
@@ -1457,7 +1456,7 @@ function renderChart() {
   });
   svg += `<path d="${linePath}" fill="none" stroke="#1a1a1a" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>`;
 
-  // Dots on cumulative line
+  // Dots on cumulative net income line
   periodData.forEach((p, i) => {
     const cx = padL + i * gap + gap / 2;
     const cy = y(p.cumulative);
