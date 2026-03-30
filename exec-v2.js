@@ -1353,12 +1353,15 @@ function renderChart() {
   if (!container) return;
   if (periods.length === 0) { container.innerHTML = '<p style="color:var(--text-dim);text-align:center;padding:40px;">No data</p>'; return; }
 
-  // Compute net income per period
+  // Compute net income per period — only up to current month
+  const now = new Date();
+  const curYear = now.getFullYear();
+  const curMonth = now.getMonth(); // 0-indexed
   const periodData = periods.map((p, i) => {
     const recs = getRecordsForPeriod(p);
     const comp = computePeriod(recs, p);
     return { ...p, income: comp.totalIncome, expense: comp.totalOpex, net: comp.netIncome, idx: i };
-  });
+  }).filter(p => p.start <= now);
 
   // Cumulative net income line
   let cumulative = 0;
