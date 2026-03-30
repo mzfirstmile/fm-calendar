@@ -121,18 +121,45 @@ async function sendReply(token: string, original: any, replyHtml: string): Promi
 
   const fullBody = `${replyHtml}\n<br>\n${SIGNATURE_HTML}`;
 
-  const message = {
+  // Reply-all: send to the original sender, CC everyone else on the thread
+  // Collect all recipients from original to/cc, excluding our own mailbox
+  const allRecipients = [
+    ...(original.to_addresses || []),
+    ...(original.cc_addresses || []),
+  ].filter((r: any) => r.email && r.email.toLowerCase() !== MAILBOX.toLowerCase());
+
+  // The sender gets the reply as "To"
+  const toRecipients = [
+    {
+      emailAddress: {
+        address: original.from_address,
+        name: original.from_name || undefined,
+      },
+    },
+  ];
+
+  // Everyone else on the thread goes in CC (deduped, excluding the sender)
+  const senderEmail = original.from_address.toLowerCase();
+  const seenEmails = new Set([senderEmail, MAILBOX.toLowerCase()]);
+  const ccRecipients: any[] = [];
+  for (const r of allRecipients) {
+    const email = r.email.toLowerCase();
+    if (!seenEmails.has(email)) {
+      seenEmails.add(email);
+      ccRecipients.push({
+        emailAddress: { address: r.email, name: r.name || undefined },
+      });
+    }
+  }
+
+  const message: any = {
     subject: replySubject,
     body: { contentType: "HTML", content: fullBody },
-    toRecipients: [
-      {
-        emailAddress: {
-          address: original.from_address,
-          name: original.from_name || undefined,
-        },
-      },
-    ],
+    toRecipients,
   };
+  if (ccRecipients.length > 0) {
+    message.ccRecipients = ccRecipients;
+  }
 
   // If there's a conversation ID, try to reply in-thread
   const payload: any = { message, saveToSentItems: true };
@@ -231,10 +258,13 @@ serve(async (req: Request) => {
 
     // replied_at already set by atomic lock above — no need to update again
 
-    // Log the sent reply
+    // Log the sent reply (including CC recipients from reply-all)
+    const logCc = (email.to_addresses || [])
+      .concat(email.cc_addresses || [])
+      .filter((r: any) => r.email && r.email.toLowerCase() !== MAILBOX.toLowerCase() && r.email.toLowerCase() !== email.from_address.toLowerCase());
     await sb.from("email_sent_log").insert({
       to_addresses: [{ email: email.from_address, name: email.from_name }],
-      cc_addresses: [],
+      cc_addresses: logCc,
       subject: email.subject.startsWith("Re:") ? email.subject : `Re: ${email.subject}`,
       body_html: replyHtml + SIGNATURE_HTML,
       sent_by: "ai-auto-reply",
