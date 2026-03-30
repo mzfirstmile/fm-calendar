@@ -435,17 +435,17 @@ VALUES
   ('prop_132_40_metropolitan', '5990', 'TOTAL EXPENSES', 2027, 10, 10506.33),
   ('prop_132_40_metropolitan', '5990', 'TOTAL EXPENSES', 2027, 11, 10506.33),
   ('prop_132_40_metropolitan', '5990', 'TOTAL EXPENSES', 2027, 12, 10506.33),
-  -- NOI corrected: excludes RET pass-throughs. Annual NOI = $1,012,323, smoothed monthly.
-  ('prop_132_40_metropolitan', '6999', 'NET OPERATING INCOME', 2027, 1, 84360.21),
-  ('prop_132_40_metropolitan', '6999', 'NET OPERATING INCOME', 2027, 2, 84360.21),
-  ('prop_132_40_metropolitan', '6999', 'NET OPERATING INCOME', 2027, 3, 84360.21),
-  ('prop_132_40_metropolitan', '6999', 'NET OPERATING INCOME', 2027, 4, 84360.21),
-  ('prop_132_40_metropolitan', '6999', 'NET OPERATING INCOME', 2027, 5, 84360.21),
-  ('prop_132_40_metropolitan', '6999', 'NET OPERATING INCOME', 2027, 6, 84360.21),
-  ('prop_132_40_metropolitan', '6999', 'NET OPERATING INCOME', 2027, 7, 84360.21),
-  ('prop_132_40_metropolitan', '6999', 'NET OPERATING INCOME', 2027, 8, 84360.21),
-  ('prop_132_40_metropolitan', '6999', 'NET OPERATING INCOME', 2027, 9, 84360.21),
-  ('prop_132_40_metropolitan', '6999', 'NET OPERATING INCOME', 2027, 10, 84360.21),
-  ('prop_132_40_metropolitan', '6999', 'NET OPERATING INCOME', 2027, 11, 84360.21),
-  ('prop_132_40_metropolitan', '6999', 'NET OPERATING INCOME', 2027, 12, 84360.21)
+  -- NOI per Morris: $1,390,000 annual, smoothed monthly.
+  ('prop_132_40_metropolitan', '6999', 'NET OPERATING INCOME', 2027, 1, 115833.33),
+  ('prop_132_40_metropolitan', '6999', 'NET OPERATING INCOME', 2027, 2, 115833.33),
+  ('prop_132_40_metropolitan', '6999', 'NET OPERATING INCOME', 2027, 3, 115833.33),
+  ('prop_132_40_metropolitan', '6999', 'NET OPERATING INCOME', 2027, 4, 115833.33),
+  ('prop_132_40_metropolitan', '6999', 'NET OPERATING INCOME', 2027, 5, 115833.33),
+  ('prop_132_40_metropolitan', '6999', 'NET OPERATING INCOME', 2027, 6, 115833.33),
+  ('prop_132_40_metropolitan', '6999', 'NET OPERATING INCOME', 2027, 7, 115833.33),
+  ('prop_132_40_metropolitan', '6999', 'NET OPERATING INCOME', 2027, 8, 115833.33),
+  ('prop_132_40_metropolitan', '6999', 'NET OPERATING INCOME', 2027, 9, 115833.33),
+  ('prop_132_40_metropolitan', '6999', 'NET OPERATING INCOME', 2027, 10, 115833.33),
+  ('prop_132_40_metropolitan', '6999', 'NET OPERATING INCOME', 2027, 11, 115833.33),
+  ('prop_132_40_metropolitan', '6999', 'NET OPERATING INCOME', 2027, 12, 115833.33)
 ON CONFLICT (property_id, gl_code, year, month) DO UPDATE SET amount = EXCLUDED.amount, account_name = EXCLUDED.account_name;
