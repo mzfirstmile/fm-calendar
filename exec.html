@@ -4182,6 +4182,7 @@ async function saveLoanOutEdit(idx, idsStr) {
       }
     }
     showToast('Loan updated');
+    renderPeriodDashboard();
     loadBalanceSheet();
   } catch(e) {
     showToast('Error: ' + e.message, 'error');
