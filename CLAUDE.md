@@ -49,18 +49,22 @@ The embedded Claude chat has access to these tools:
 ## Quarterly Financial Report
 - **What:** Quarterly email + PDF to Morris summarizing YTD financials — net position, net income, cash flow, P&L breakdown, balance sheet, investments, and narrative highlights (positives + areas to watch)
 - **PDF:** Generated via `scripts/build_monthly_digest.py` using reportlab — 3 pages: executive summary + P&L, balance sheet + cash flow, footer. Named `First_Mile_Capital_Q1_2026_Report.pdf` etc.
-- **Email:** Sent via send-email edge function to mz@firstmilecap.com with HTML summary + PDF attachment
+- **Email:** Sent via send-email edge function. To: mz@firstmilecap.com, CC: rc@firstmilecap.com, ty@firstmilecap.com, src@cacq.com. Body is FULL HTML report (not just summary) — tables for KPI metrics, P&L, balance sheet, cash, investments, liabilities, cash flow, loans. PDF also attached.
+- **Email format:** Morris wants the email body to be the full report embedded as HTML (like a PDF rendered in email), NOT a short summary with just highlights. Always include all tables and sections.
+- **CC recipients:** send-email edge function `cc` field must be an ARRAY of strings, not comma-separated (Graph API rejects comma-separated).
 - **Timing:** Run after Morris closes the books each quarter (Q1–Q4). Not on a fixed schedule — triggered manually or via scheduled task.
 - **Output:** Saved to `~/First Mile Dropbox/Morris Zeitouni/FM Quarterly Reports/` (falls back to `reports/` in workspace). `reports/` is gitignored.
-- **Attachment support:** send-email edge function updated locally to accept `attachments` array (each: `{name, contentType, contentBytes}` where contentBytes is base64). Needs `supabase functions deploy send-email` to go live.
-- **Test email sent:** 2026-03-29 (Q1 test WITH PDF attachment — confirmed working via send-email edge function)
-- **Cash note:** ~$4M in SAVINGS account is investor capital held for deployment (Six Fields/Lifetime AZ loan), NOT discretionary FM cash. Operating cash is only ~$346K. Report calls this out explicitly.
-- **Other Assets:** ReWyre (Rasheq Zarif salary, ~$104K) tracked as asset on books
+- **Attachment support:** send-email edge function accepts `attachments` array (each: `{name, contentType, contentBytes}` where contentBytes is base64).
+- **Sent:** 2026-03-29 Q1 report sent to all 4 executives (Morris, Ricky, Toby, Stanley) with full HTML body + PDF attachment.
+- **Cash note:** ~$4M in SAVINGS account is investor capital held for deployment (Six Fields/Lifetime AZ loan), NOT discretionary FM cash. Operating cash is only ~$346K. Report asterisks the $4M in both PDF and email.
+- **Terminology:** Use "Total Revenue" (not "Total Income") everywhere — only "Net Income" uses the word "income". Applied to PDF, email, and exec.html dashboard.
 - **NOI dependency:** Balance sheet investment valuations depend on NOI data from budget module. exec.html now waits for NOI before showing net position (no more flash of wrong -$4M number).
 
 ## Pending / Known Issues
 - **132-40 Metropolitan NOI not showing on balance sheet:** Property exists in exec_investments but shows $0 valuation. FB_PROP_META updated in index.html code, but live site needs git push. Also `fbGlAccounts` was null when trying to recompute budget data — GL accounts may not have loaded. Budget rows DO exist in Supabase (confirmed).
 - **Investment contribution → auto-update contributed amount:** When linking a wire to an investment via dropdown, should also increment that investment's `contributed` field. Not yet implemented.
+- **Net Position line chart (quarterly snapshot):** Once quarterly books are officially closed, create a snapshot of balance sheet net position so we can build a line chart tracking net position over time (same style as the existing net income line chart). Needs a DB table for quarterly snapshots (e.g. `exec_quarterly_snapshots` with columns: quarter, year, net_position, total_assets, total_liabilities, net_income, snapshot_date).
+- **Cash flow chart should show Net Income P&L:** The "cash flow" line chart on exec.html currently shows net cash flow — Morris wants it to show Net Income (P&L) instead. Update the chart data source when implementing.
 - **Git push from sandbox not possible:** `git push` returns 403 from proxy. Morris pushes from his machine. Always commit locally and remind Morris to push.
 
 ## Email Signature (include in ALL outbound emails as HTML)

@@ -30,8 +30,8 @@ data = {
     "note": "Note: March books are not yet closed. Figures reflect data through most recent bank sync.",
 
     # Balance Sheet (with NOI-based investment valuations)
-    "net_position": 7065240,
-    "total_assets": 18602599,
+    "net_position": 7301120,
+    "total_assets": 18838479,
     "total_liabilities": 11537359,
 
     # Cash
@@ -60,16 +60,18 @@ data = {
         ("FV Oakmanor JV", 0),
     ],
 
-    # Other Assets
-    "other_assets": [
-        ("ReWyre — Rasheq Zarif Salary", 104000),
-    ],
+    # Other Assets (none — ReWyre now tracked as Loan Out)
+    "other_assets": [],
 
     # Loans Out
-    "loans_out_total": 193500,
+    "loans_out_total": 429380,
     "loans_out": [
-        ("CPTK Continental (Jan 8)", 6000),
         ("Wooster - Ricky (Jan 19)", 187500),
+        ("ReWyre - Rasheq Salary (Mar 29)", 104000),
+        ("Kemble loan - FCB late (Mar 19 & 23)", 100000),
+        ("Greenwich loan (Mar 23)", 25000),
+        ("FM Red JV - LJ (Feb 24)", 6880),
+        ("CPTK Continental (Jan 8)", 6000),
     ],
 
     # Liabilities
@@ -79,49 +81,49 @@ data = {
         ("Six Fields - Lifetime", 2500000, "4.3y"),
     ],
 
-    # P&L
-    "total_income": 1023009,
-    "total_expenses": 1001813,
-    "net_income": 21197,
+    # P&L (totals use gross PM Fee income and gross payroll)
+    "total_income": 1428053,
+    "total_expenses": 908900,
+    "net_income": 519153,
 
-    # Income Breakdown
+    # Income Breakdown (PM Fee shown net of payroll reimbursement)
     "income": [
-        ("Development Fee Income", 240469, 23.5),
-        ("Property Management Fee Income", 218494, 21.4),
-        ("Asset Management Fee Income", 162245, 15.9),
-        ("Investment Income", 132629, 13.0),
-        ("Interest Income", 25974, 2.5),
-        ("Other Income", 20000, 2.0),
+        ("Property Mgmt Fee Income (net)", 523507, 36.7),
+        ("Development Fee Income", 240469, 16.8),
+        ("Investment Income", 199457, 14.0),
+        ("Asset Management Fee Income", 186179, 13.0),
+        ("Interest Income", 35242, 2.5),
+        ("Other Income", 20000, 1.4),
     ],
 
-    # Expense Breakdown
+    # Expense Breakdown (Payroll shown net of reimbursements)
     "expenses": [
-        ("Payroll", 404120, 30.3),  # net
-        ("Finders Fee", 120000, 9.2),
-        ("Interest Expense", 60890, 4.6),
-        ("Legal/Corp Services", 53267, 4.0),
-        ("Credit Cards", 35544, 2.7),
-        ("Marketing", 28084, 2.2),
-        ("Rent", 24268, 1.8),
-        ("Travel", 21117, 1.6),
-        ("Banking", 12199, 0.9),
-        ("Software/Services", 8158, 0.6),
-        ("Contractors", 5400, 0.4),
-        ("Taxes", 2850, 0.2),
-        ("Checks", 2717, 0.2),
+        ("Payroll (net)", 308582, 33.9),
+        ("Finders Fee", 120000, 13.2),
+        ("Interest Expense", 60890, 6.7),
+        ("Legal/Corp Services", 55892, 6.2),
+        ("Credit Cards", 35544, 3.9),
+        ("Marketing", 28084, 3.1),
+        ("Rent", 24268, 2.7),
+        ("Travel", 21117, 2.3),
+        ("Banking", 12199, 1.3),
+        ("Software/Services", 8158, 0.9),
+        ("Contractors", 5400, 0.6),
+        ("Taxes", 2850, 0.3),
+        ("Checks", 2717, 0.3),
     ],
 
     # Cash Flow / BS Transactions
     "owner_distros": -164000,
     "investment_contributions": -37500,
-    "loans_out_flow": -193500,
-    "cash_flow": -373800,
+    "loans_out_flow": -429380,
+    "cash_flow": -111727,
 
     # Balance Sheet Transactions
     "bs_transactions": [
+        ("Loans Out", 429380, 7),
         ("Owner Distributions", 164000, 2),
         ("Investment Contributions", 37500, 2),
-        ("Loans Out", 193500, 2),
     ],
 }
 
@@ -141,7 +143,7 @@ LIGHT_TEXT = HexColor("#6c757d")
 styles = getSampleStyleSheet()
 
 title_style = ParagraphStyle('CustomTitle', parent=styles['Title'],
-    fontSize=24, textColor=NAVY, spaceAfter=4, fontName='Helvetica-Bold')
+    fontSize=24, textColor=NAVY, spaceAfter=12, fontName='Helvetica-Bold')
 subtitle_style = ParagraphStyle('Subtitle', parent=styles['Normal'],
     fontSize=11, textColor=LIGHT_TEXT, spaceAfter=16)
 h2_style = ParagraphStyle('H2', parent=styles['Heading2'],
@@ -202,10 +204,11 @@ def build_pdf():
 
     narrative = f"""
     First Mile Capital is tracking <b>net income of {fmt(data['net_income'])}</b> year-to-date on
-    <b>{fmt(data['total_income'])}</b> in total revenue against <b>{fmt(data['total_expenses'])}</b> in
+    <b>{fmt(data['total_income'])}</b> in total revenue against <b>{fmt(data['total_expenses'])}</b> in total
     operating expenses. The firm maintains a <b>net position of {fmt(data['net_position'])}</b>, reflecting
     total assets of {fmt(data['total_assets'])} offset by {fmt(data['total_liabilities'])} in liabilities
-    (primarily fund-level and project debt).
+    (primarily fund-level and project debt). Income and expense figures reflect payroll netting — PM Fee
+    Income is shown net of payroll reimbursements, and Payroll expense is shown net of reimbursement inflows.
     """
     story.append(Paragraph(narrative.strip(), body_style))
     story.append(Spacer(1, 4))
@@ -215,10 +218,10 @@ def build_pdf():
 
     positives = f"""
     <b>Positives:</b> Net position is strong at <b>{fmt(data['net_position'])}</b>. Revenue is diversified across
-    six income streams, led by Development Fee Income ({fmt(data['income'][0][1])}, {pct(data['income'][0][2])}
-    of total) and PM Fee Income ({fmt(data['income'][1][1])}, {pct(data['income'][1][2])}). Portfolio investments
+    six income streams, led by PM Fee Income ({fmt(data['income'][0][1])} net, {pct(data['income'][0][2])}
+    of total) and Development Fee Income ({fmt(data['income'][1][1])}, {pct(data['income'][1][2])}). Portfolio investments
     are valued at {fmt(sum(i[1] for i in data['investments']))} across {len([i for i in data['investments'] if i[1] > 0])}
-    active positions. Investment income contributed {fmt(data['income'][3][1])} from portfolio returns.
+    active positions. Investment income contributed {fmt(data['income'][2][1])} from portfolio returns.
     """
     story.append(Paragraph(positives.strip(), body_style))
 
@@ -230,10 +233,10 @@ def build_pdf():
     story.append(Paragraph(cash_note.strip(), body_style))
 
     negatives = f"""
-    <b>Areas to Watch:</b> Payroll remains the largest expense at {fmt(data['expenses'][0][1])} ({pct(data['expenses'][0][2])}
+    <b>Areas to Watch:</b> Payroll remains the largest expense at {fmt(data['expenses'][0][1])} net ({pct(data['expenses'][0][2])}
     of expenses). Finders fees of {fmt(data['expenses'][1][1])} are elevated. Cash flow is negative at
-    <b>{fmt(data['cash_flow'])}</b> YTD, driven by {fmt(abs(data['owner_distros']))} in owner distributions and
-    {fmt(abs(data['loans_out_flow']))} in loans out (primarily the Wooster loan of $187,500). 132-40 Metropolitan Ave
+    <b>{fmt(data['cash_flow'])}</b> YTD, driven by {fmt(abs(data['loans_out_flow']))} in loans out (Wooster $187.5K,
+    ReWyre $104K, Kemble $100K) and {fmt(abs(data['owner_distros']))} in owner distributions. 132-40 Metropolitan Ave
     and FV Oakmanor JV still pending NOI data for valuation.
     """
     story.append(Paragraph(negatives.strip(), body_style))
@@ -266,24 +269,31 @@ def build_pdf():
 
     kpi_row = Table(
         [[make_kpi("NET INCOME", fmt(data['net_income']), net_inc_color),
-          make_kpi("TOTAL INCOME", fmt(data['total_income']), GREEN),
-          make_kpi("CASH ON HAND", fmt(data['total_cash']), ACCENT),
+          make_kpi("TOTAL REVENUE", fmt(data['total_income']), GREEN),
+          make_kpi("CASH ON HAND*", fmt(data['total_cash']), ACCENT),
           make_kpi("NET POSITION", fmt(data['net_position']), net_pos_color)]],
         colWidths=[page_w/4]*4,
         style=TableStyle([('VALIGN', (0,0), (-1,-1), 'TOP')])
     )
     story.append(kpi_row)
-    story.append(Spacer(1, 14))
+    kpi_footnote = ParagraphStyle('KpiFootnote', parent=styles['Normal'],
+        fontSize=8, textColor=ORANGE, leading=11, spaceBefore=2, spaceAfter=8, fontName='Helvetica-Oblique')
+    story.append(Paragraph(
+        f"* Cash on hand includes {fmt(data['investor_hold_cash'])} in SAVINGS (Six Fields capital being deployed shortly). "
+        f"Operating cash: ~{fmt(data['operating_cash'])}.",
+        kpi_footnote
+    ))
+    story.append(Spacer(1, 6))
 
     # ─── P&L TABLE ───
     story.append(Paragraph("Profit & Loss", h2_style))
 
-    # Income table
-    story.append(Paragraph("Income", h3_style))
+    # Revenue table
+    story.append(Paragraph("Revenue", h3_style))
     inc_data = [["Category", "Amount", "% of Total"]]
     for name, amt, pctv in data['income']:
         inc_data.append([name, fmt(amt), pct(pctv)])
-    inc_data.append(["TOTAL INCOME", fmt(data['total_income']), "100%"])
+    inc_data.append(["TOTAL REVENUE", fmt(data['total_income']), "100%"])
 
     inc_table = Table(inc_data, colWidths=[page_w*0.55, page_w*0.25, page_w*0.20])
     inc_table.setStyle(TableStyle([
