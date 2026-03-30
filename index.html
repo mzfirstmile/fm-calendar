@@ -3192,7 +3192,21 @@ You have your own phone number: +1 (866) 568-4445. You can send and search SMS m
           });
         }
 
-        bgtData.sort((a, b) => a.name.localeCompare(b.name));
+        // Fetch close dates from exec_investments and attach to bgtData
+        try {
+          const invRows = await supaFetch('exec_investments', '?select=property_id,close_date&close_date=not.is.null');
+          const closeDateMap = {};
+          invRows.forEach(r => { if (r.property_id && r.close_date) closeDateMap[r.property_id] = r.close_date; });
+          bgtData.forEach(p => { p.closeDate = closeDateMap[p.id] || null; });
+        } catch(e) { console.warn('Could not fetch close dates:', e); }
+
+        // Sort by close date (newest first), properties without close date at end
+        bgtData.sort((a, b) => {
+          if (a.closeDate && b.closeDate) return b.closeDate.localeCompare(a.closeDate);
+          if (a.closeDate && !b.closeDate) return -1;
+          if (!a.closeDate && b.closeDate) return 1;
+          return a.name.localeCompare(b.name);
+        });
 
         // Send NOI to exec iframe (may or may not be loaded yet)
         sendNOIToExec();
@@ -3248,7 +3262,7 @@ You have your own phone number: +1 (866) 568-4445. You can send and search SMS m
           <div class="fb-card-name">${p.name}</div>
         </div>
         <div class="fb-card-body">
-          <div class="fb-card-meta">${p.sqft ? p.sqft.toLocaleString() + ' SF' : ''}</div>
+          <div class="fb-card-meta">${p.sqft ? p.sqft.toLocaleString() + ' SF' : ''}${p.closeDate ? (p.sqft ? ' · ' : '') + 'Closed ' + new Date(p.closeDate + 'T00:00:00').toLocaleDateString('en-US', {month:'short', year:'numeric'}) : ''}</div>
           <div class="fb-card-metrics" style="grid-template-columns:1fr 1fr 1fr;">
             <div class="fb-card-metric">
               <div class="fb-card-metric-label">Revenue</div>
