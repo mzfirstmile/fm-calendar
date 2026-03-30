@@ -3387,6 +3387,10 @@ async function loadBalanceSheet() {
       notes: r.notes || ''
     }));
     renderBalanceSheet();
+    // Re-populate revenue filter now that bsProperties/bsInvestments are loaded
+    if (typeof lastPeriodComp !== 'undefined' && lastPeriodComp) {
+      populateRevenueFilter(lastPeriodComp);
+    }
   } catch (e) {
     console.error('Balance sheet load error:', e);
     document.getElementById('bsInvestments').innerHTML = `<p style="color:var(--red);padding:16px;">Failed to load: ${e.message}</p>`;
