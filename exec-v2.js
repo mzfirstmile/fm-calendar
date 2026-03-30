@@ -1382,7 +1382,7 @@ function renderChart() {
   const rangeY = maxY - minY || 1;
 
   const y = v => padT + chartH - ((v - minY) / rangeY * chartH);
-  const gap = chartW / periods.length;
+  const gap = chartW / periodData.length;
   const barW = Math.min(gap * 0.55, 50);
 
   let svg = `<svg width="100%" height="${H}" viewBox="0 0 ${W} ${H}" preserveAspectRatio="xMidYMid meet">`;
