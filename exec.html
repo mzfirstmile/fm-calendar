@@ -2732,6 +2732,8 @@ function closeReviewPanel() {
   renderPeriodDashboard();
 }
 
+let reviewOpenGroups = new Set(); // track which category groups are expanded
+
 function setReviewFilter(mode) { reviewFilterMode = mode; renderReviewPanel(); }
 
 function renderReviewPanel() {
@@ -2780,16 +2782,18 @@ function renderReviewPanel() {
     const isGenericGroup = GENERIC_CATEGORIES.has(catName);
     const hasUnlinked = txns.some(t => t.needsLink);
     const icon = isGenericGroup ? '⚠️' : (hasUnlinked ? '🔗' : '✓');
+    const isOpen = reviewOpenGroups.has(catName);
+    const safeCat = catName.replace(/'/g, "\\'");
     html += `
       <div class="review-group">
-        <div class="review-group-header" onclick="this.nextElementSibling.classList.toggle('open');this.querySelector('.review-chevron').textContent=this.nextElementSibling.classList.contains('open')?'▼':'▶'">
-          <h4>${icon} ${catName} <span class="review-chevron" style="font-size:11px;color:var(--text-dim);">▶</span></h4>
+        <div class="review-group-header" onclick="toggleReviewGroup('${safeCat}', this)">
+          <h4>${icon} ${catName} <span class="review-chevron" style="font-size:11px;color:var(--text-dim);">${isOpen ? '▼' : '▶'}</span></h4>
           <div>
             <span class="review-group-count">${txns.length} txn${txns.length !== 1 ? 's' : ''}</span>
             <span style="margin-left:12px;font-weight:600;font-size:13px;color:${totalAmt >= 0 ? 'var(--green-dark)' : 'var(--red-dark)'}">${totalAmt >= 0 ? '+' : ''}${fmtFull(totalAmt)}</span>
           </div>
         </div>
-        <div class="review-group-rows">`;
+        <div class="review-group-rows${isOpen ? ' open' : ''}">`;
 
     txns.sort((a, b) => b.date - a.date);
     txns.forEach(t => {
@@ -2830,6 +2834,14 @@ function renderReviewPanel() {
   });
 
   document.getElementById('reviewContent').innerHTML = html;
+}
+
+function toggleReviewGroup(catName, headerEl) {
+  if (reviewOpenGroups.has(catName)) reviewOpenGroups.delete(catName);
+  else reviewOpenGroups.add(catName);
+  const rows = headerEl.nextElementSibling;
+  rows.classList.toggle('open');
+  headerEl.querySelector('.review-chevron').textContent = rows.classList.contains('open') ? '▼' : '▶';
 }
 
 async function reviewChangeCategory(recordId, newCategory) {
