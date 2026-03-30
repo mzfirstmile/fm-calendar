@@ -570,8 +570,11 @@
 
   <!-- Income Breakdown -->
   <div class="cat-section" id="incomeSection">
-    <div class="cat-section-header">
+    <div class="cat-section-header" style="display:flex;align-items:center;justify-content:space-between;">
       <h3>Revenue</h3>
+      <select id="revenuePropertyFilter" style="font-size:11px;padding:3px 8px;border:1px solid var(--border);border-radius:6px;background:var(--surface2);color:var(--text);max-width:180px;" onchange="filterRevenueByProperty(this.value)">
+        <option value="">All Properties</option>
+      </select>
     </div>
     <div id="incomeRows"></div>
   </div>
@@ -1512,7 +1515,19 @@ function renderPeriodDashboard() {
       subNote: `Gross: ${fmtFull(grossPM)} | Less payroll: -${fmtFull(comp.payrollSplitTotal)}`
     };
   }
-  renderCategoryRows('incomeRows', incDisplay, 'income', comp.totalIncome);
+  // Populate revenue property filter dropdown
+  populateRevenueFilter(comp);
+
+  // Apply revenue property filter if set
+  const revFilter = document.getElementById('revenuePropertyFilter');
+  const revFilterValue = revFilter ? revFilter.value : '';
+  let filteredIncDisplay = incDisplay;
+  let filteredIncTotal = comp.totalIncome;
+  if (revFilterValue) {
+    filteredIncDisplay = filterIncomeBucketsByPropInv(comp, revFilterValue);
+    filteredIncTotal = Object.values(filteredIncDisplay).reduce((s, v) => s + v.total, 0);
+  }
+  renderCategoryRows('incomeRows', filteredIncDisplay, 'income', filteredIncTotal);
 
   // Operating expense rows — show Payroll net of ALL reimbursements (standalone + splits)
   const opexDisplay = { ...comp.opexBuckets };
@@ -1539,6 +1554,74 @@ function renderPeriodDashboard() {
   exDiv.innerHTML = excludedEntries.map(([type, data]) =>
     `<div class="excluded-row" style="cursor:pointer;" onclick="openDrilldown('${type}', 'expense')"><span>${type} (${data.count})</span><span>${fmtFull(data.total)}</span></div>`
   ).join('');
+}
+
+function populateRevenueFilter(comp) {
+  const filter = document.getElementById('revenuePropertyFilter');
+  if (!filter) return;
+  const currentVal = filter.value;
+  // Collect properties/investments that have linked income transactions
+  const linkedEntities = new Map(); // key -> label
+  const propIds = new Set(bsProperties.map(p => p.id));
+  allRecords.forEach(r => {
+    const { category } = categorize(r);
+    if (category !== 'income') return;
+    const propId = propertyLinks[r.id];
+    const invId = investmentLinks[r.id];
+    if (propId) {
+      const prop = bsProperties.find(p => p.id === propId);
+      if (prop) linkedEntities.set('prop:' + propId, prop.property_name);
+    }
+    if (invId) {
+      const inv = bsInvestments.find(i => i.id === invId);
+      if (inv && (!inv.propertyId || !propIds.has(inv.propertyId))) linkedEntities.set('inv:' + invId, inv.name);
+    }
+  });
+  let optsHtml = '<option value="">All Properties</option>';
+  [...linkedEntities.entries()].sort((a,b) => a[1].localeCompare(b[1])).forEach(([key, label]) => {
+    optsHtml += `<option value="${key}" ${key === currentVal ? 'selected' : ''}>${label}</option>`;
+  });
+  filter.innerHTML = optsHtml;
+}
+
+function filterIncomeBucketsByPropInv(comp, filterValue) {
+  const [type, id] = filterValue.split(':');
+  const filtered = {};
+  // Re-bucket income records that match the filter
+  allRecords.forEach(r => {
+    const { category, type: catType } = categorize(r);
+    if (category !== 'income') return;
+    const amount = getAmount(r);
+    let matches = false;
+    if (type === 'prop' && propertyLinks[r.id] === id) matches = true;
+    if (type === 'inv' && investmentLinks[r.id] === id) matches = true;
+    if (!matches) return;
+    if (!filtered[catType]) filtered[catType] = { total: 0, count: 0, records: [] };
+    filtered[catType].total += amount;
+    filtered[catType].count++;
+    filtered[catType].records.push(r);
+  });
+  return filtered;
+}
+
+function filterRevenueByProperty(value) {
+  // Re-render just the revenue section without full refresh
+  if (typeof lastPeriodComp !== 'undefined' && lastPeriodComp) {
+    const comp = lastPeriodComp;
+    const incDisplay = { ...comp.incomeBuckets };
+    if (incDisplay['Property Management Fee Income'] && comp.payrollSplitTotal > 0) {
+      const grossPM = incDisplay['Property Management Fee Income'].total;
+      const netPM = grossPM - comp.payrollSplitTotal;
+      incDisplay['Property Management Fee Income'] = { ...incDisplay['Property Management Fee Income'], total: netPM, subNote: `Gross: ${fmtFull(grossPM)} | Less payroll: -${fmtFull(comp.payrollSplitTotal)}` };
+    }
+    let filteredIncDisplay = incDisplay;
+    let filteredIncTotal = comp.totalIncome;
+    if (value) {
+      filteredIncDisplay = filterIncomeBucketsByPropInv(comp, value);
+      filteredIncTotal = Object.values(filteredIncDisplay).reduce((s, v) => s + v.total, 0);
+    }
+    renderCategoryRows('incomeRows', filteredIncDisplay, 'income', filteredIncTotal);
+  }
 }
 
 function renderCategoryRows(containerId, buckets, cssClass, total) {
@@ -1845,12 +1928,12 @@ function openDrilldown(type, cssClass) {
           // Combined Property + Investment dropdown for fee income (deduped by name)
           const currentPropId = propertyLinks[d.recordId] || '';
           const currentInvId = investmentLinks[d.recordId] || '';
-          const seenNames = new Set();
+          const propIds = new Set(bsProperties.map(p => p.id));
           let optsHtml = `<option value="">— Property / Investment —</option>`;
           optsHtml += `<optgroup label="Properties">`;
-          bsProperties.forEach(p => { seenNames.add(p.property_name.toLowerCase()); optsHtml += `<option value="prop:${p.id}" ${p.id === currentPropId ? 'selected' : ''}>${p.property_name}</option>`; });
+          bsProperties.forEach(p => { optsHtml += `<option value="prop:${p.id}" ${p.id === currentPropId ? 'selected' : ''}>${p.property_name}</option>`; });
           optsHtml += `</optgroup><optgroup label="Investments">`;
-          bsInvestments.forEach(inv => { if (!seenNames.has((inv.name||'').toLowerCase())) optsHtml += `<option value="inv:${inv.id}" ${inv.id === currentInvId ? 'selected' : ''}>${inv.name}</option>`; });
+          bsInvestments.forEach(inv => { if (!inv.propertyId || !propIds.has(inv.propertyId)) optsHtml += `<option value="inv:${inv.id}" ${inv.id === currentInvId ? 'selected' : ''}>${inv.name}</option>`; });
           optsHtml += `</optgroup>`;
           linkHtml = `<select class="txn-cat-select" style="max-width:130px;font-size:10px;" onchange="linkToPropOrInv('${d.recordId}', this.value)">${optsHtml}</select>`;
         } else if (isInvestmentIncome && d.recordId) {
@@ -1866,6 +1949,13 @@ function openDrilldown(type, cssClass) {
           const liabOpts = [`<option value="">— Loan —</option>`];
           bsLiabilities.forEach(l => { liabOpts.push(`<option value="${l.id}" ${l.id === currentLiabId ? 'selected' : ''}>${l.lender}${l.relatedDeal ? ' — ' + l.relatedDeal : ''}</option>`); });
           linkHtml = `<select class="txn-cat-select" style="max-width:130px;font-size:10px;" onchange="linkToLiability('${d.recordId}', this.value)">${liabOpts.join('')}</select>`;
+        } else if (d.currentType === 'Loan Payback' && d.recordId) {
+          // Loan dropdown for loan payback — link to existing Loan Out names
+          const loanNames = getExistingLoanNames();
+          const currentLoan = categoryNames[d.recordId] || '';
+          const loanOpts = [`<option value="">— Apply to Loan —</option>`];
+          loanNames.forEach((ids, name) => { loanOpts.push(`<option value="${name}" ${name === currentLoan ? 'selected' : ''}>${name}</option>`); });
+          linkHtml = `<select class="txn-cat-select" style="max-width:130px;font-size:10px;" onchange="linkToLoan('${d.recordId}', this.value)">${loanOpts.join('')}</select>`;
         }
 
         html += `
@@ -2100,6 +2190,19 @@ async function linkToPropOrInv(recordId, value) {
 }
 
 // Link interest expense to a liability
+async function linkToLoan(recordId, loanName) {
+  if (loanName) categoryNames[recordId] = loanName;
+  else delete categoryNames[recordId];
+  showToast(loanName ? `Applied to: ${loanName}` : 'Unlinked');
+  if (currentDrilldownType) openDrilldown(currentDrilldownType, currentDrilldownCssClass);
+  try {
+    await supaWrite('exec_transactions', 'PATCH', { category_name: loanName || null }, `?id=eq.${recordId}`);
+  } catch(e) {
+    console.error('Failed to save loan link:', e);
+    showToast(`⚠️ Save failed: ${e.message}`, 'error');
+  }
+}
+
 async function linkToLiability(recordId, liabilityId) {
   if (liabilityId) {
     liabilityLinks[recordId] = liabilityId;
@@ -2720,6 +2823,21 @@ const GENERIC_CATEGORIES = new Set([
 const LINKABLE_TO_PROPERTY = new Set(['Asset Management Fee Income', 'Property Management Fee Income', 'Development Fee Income', 'Acquisition Fee Income']);
 const LINKABLE_TO_INVESTMENT = new Set(['Investment Income']);
 const LINKABLE_TO_LIABILITY = new Set(['Interest Expense']);
+const LINKABLE_TO_LOAN = new Set(['Loan Payback']);
+
+function getExistingLoanNames() {
+  // Collect unique loan names from Loan Out transactions
+  const names = new Map(); // name -> [recordIds]
+  allRecords.forEach(r => {
+    const { category } = categorize(r);
+    if (category === 'loan' && categoryNames[r.id]) {
+      const name = categoryNames[r.id];
+      if (!names.has(name)) names.set(name, []);
+      names.get(name).push(r.id);
+    }
+  });
+  return names;
+}
 
 let reviewFilterMode = 'all-review'; // 'all-review', 'uncategorized', 'unlinked', or specific account
 
@@ -2734,13 +2852,14 @@ function getReviewItems() {
     const needsPropLink = LINKABLE_TO_PROPERTY.has(effectiveCat) && !propertyLinks[id] && !investmentLinks[id];
     const needsInvLink = LINKABLE_TO_INVESTMENT.has(effectiveCat) && !investmentLinks[id];
     const needsLiabLink = LINKABLE_TO_LIABILITY.has(effectiveCat) && !liabilityLinks[id];
-    const needsLink = needsPropLink || needsInvLink || needsLiabLink;
+    const needsLoanLink = LINKABLE_TO_LOAN.has(effectiveCat) && !categoryNames[id];
+    const needsLink = needsPropLink || needsInvLink || needsLiabLink || needsLoanLink;
 
     if (isGeneric || needsLink) {
       items.push({
         id, date: getDate(r), desc: getDescription(r), acct: getAccountName(r),
         amount: getAmount(r), autoCategory: effectiveCat,
-        isGeneric, needsLink, needsPropLink, needsInvLink, needsLiabLink,
+        isGeneric, needsLink, needsPropLink, needsInvLink, needsLiabLink, needsLoanLink,
         reason: isGeneric ? 'uncategorized' : 'unlinked'
       });
     }
@@ -2872,13 +2991,13 @@ function toggleReviewGroup(catName, headerEl) {
 function buildReviewLinkDropdown(recordId, category) {
   // Returns HTML for the appropriate linking dropdown based on category
   if (LINKABLE_TO_PROPERTY.has(category)) {
-    // Combined Property + Investment dropdown (deduped by name)
-    const seenNames = new Set();
+    // Combined Property + Investment dropdown (skip investments already linked to a property)
+    const propIds = new Set(bsProperties.map(p => p.id));
     let optsHtml = `<option value="">— Property / Investment —</option>`;
     optsHtml += `<optgroup label="Properties">`;
-    bsProperties.forEach(p => { seenNames.add(p.property_name.toLowerCase()); optsHtml += `<option value="prop:${p.id}">${p.property_name}</option>`; });
+    bsProperties.forEach(p => { optsHtml += `<option value="prop:${p.id}">${p.property_name}</option>`; });
     optsHtml += `</optgroup><optgroup label="Investments">`;
-    bsInvestments.forEach(inv => { if (!seenNames.has((inv.name||'').toLowerCase())) optsHtml += `<option value="inv:${inv.id}">${inv.name}</option>`; });
+    bsInvestments.forEach(inv => { if (!inv.propertyId || !propIds.has(inv.propertyId)) optsHtml += `<option value="inv:${inv.id}">${inv.name}</option>`; });
     optsHtml += `</optgroup>`;
     return `<select class="txn-cat-select review-link" onchange="reviewLinkPropOrInv('${recordId}', this.value)">${optsHtml}</select>`;
   } else if (LINKABLE_TO_INVESTMENT.has(category)) {
@@ -2889,6 +3008,12 @@ function buildReviewLinkDropdown(recordId, category) {
     const liabOpts = [`<option value="">— Loan —</option>`];
     bsLiabilities.forEach(l => { liabOpts.push(`<option value="${l.id}">${l.lender}${l.relatedDeal ? ' — ' + l.relatedDeal : ''}</option>`); });
     return `<select class="txn-cat-select review-link" onchange="reviewLinkLiability('${recordId}', this.value)">${liabOpts.join('')}</select>`;
+  } else if (LINKABLE_TO_LOAN.has(category)) {
+    const loanNames = getExistingLoanNames();
+    const currentName = categoryNames[recordId] || '';
+    const loanOpts = [`<option value="">— Apply to Loan —</option>`];
+    loanNames.forEach((ids, name) => { loanOpts.push(`<option value="${name}" ${name === currentName ? 'selected' : ''}>${name}</option>`); });
+    return `<select class="txn-cat-select review-link" onchange="reviewLinkLoan('${recordId}', this.value)">${loanOpts.join('')}</select>`;
   }
   return '<div class="review-link"></div>';
 }
@@ -2956,6 +3081,15 @@ async function reviewLinkLiability(recordId, liabilityId) {
   showToast(liabilityId ? 'Linked to loan' : 'Unlinked');
   updateReviewBadge();
   try { await supaWrite('exec_transactions', 'PATCH', { liability_id: liabilityId || null }, `?id=eq.${recordId}`); }
+  catch(e) { showToast(`⚠️ Save failed: ${e.message}`, 'error'); }
+}
+
+async function reviewLinkLoan(recordId, loanName) {
+  if (loanName) categoryNames[recordId] = loanName;
+  else delete categoryNames[recordId];
+  showToast(loanName ? `Applied to: ${loanName}` : 'Unlinked');
+  updateReviewBadge();
+  try { await supaWrite('exec_transactions', 'PATCH', { category_name: loanName || null }, `?id=eq.${recordId}`); }
   catch(e) { showToast(`⚠️ Save failed: ${e.message}`, 'error'); }
 }
 
@@ -3347,16 +3481,44 @@ function renderBalanceSheet() {
   let depositsTotal = 0;
   const loanOutItems = [];
   const depositItems = [];
+  // Track loan payback amounts by loan name for netting
+  const loanPaybackByName = {}; // loanName -> total payback amount
   allRecords.forEach(r => {
     const { category, type } = categorize(r);
     const amount = getAmount(r);
     if (category === 'loan') {
       loansOutTotal += Math.abs(amount);
-      loanOutItems.push({ desc: categoryNames[r.id] || getDescription(r), amount: Math.abs(amount), date: getDate(r), acct: getAccountName(r) });
+      loanOutItems.push({ id: r.id, desc: categoryNames[r.id] || getDescription(r), name: categoryNames[r.id] || null, amount: Math.abs(amount), date: getDate(r), acct: getAccountName(r) });
+    } else if (category === 'loan_payback') {
+      const linkedLoan = categoryNames[r.id];
+      if (linkedLoan) {
+        if (!loanPaybackByName[linkedLoan]) loanPaybackByName[linkedLoan] = 0;
+        loanPaybackByName[linkedLoan] += Math.abs(amount);
+      }
     } else if (category === 'deposit') {
       depositsTotal += Math.abs(amount);
       depositItems.push({ desc: categoryNames[r.id] || getDescription(r), amount: Math.abs(amount), date: getDate(r), acct: getAccountName(r) });
     }
+  });
+  // Group loan outs by name (combine same-named loans) and net paybacks
+  const loanGroups = {};
+  loanOutItems.forEach(item => {
+    const key = item.name || `__unnamed_${item.desc}_${item.date}`;
+    if (!loanGroups[key]) loanGroups[key] = { desc: item.name || item.desc, name: item.name, amount: 0, payback: 0, netAmount: 0, date: item.date, acct: item.acct, count: 0, recordIds: [] };
+    loanGroups[key].amount += item.amount;
+    loanGroups[key].count++;
+    loanGroups[key].recordIds.push(item.id);
+    if (item.date > loanGroups[key].date) loanGroups[key].date = item.date; // use latest date
+  });
+  // Apply paybacks and calculate net
+  loansOutTotal = 0;
+  const consolidatedLoans = Object.values(loanGroups);
+  consolidatedLoans.forEach(item => {
+    if (item.name && loanPaybackByName[item.name]) {
+      item.payback = loanPaybackByName[item.name];
+    }
+    item.netAmount = Math.max(0, item.amount - item.payback);
+    loansOutTotal += item.netAmount;
   });
 
   const totalAssets = cash + investmentsTotal + loansOutTotal + depositsTotal;
@@ -3593,18 +3755,27 @@ function renderBalanceSheet() {
   const loansOutEl = document.getElementById('bsLoansOut');
   const loansOutTotalEl = document.getElementById('bsLoansOutTotal');
   if (loansOutTotalEl) loansOutTotalEl.textContent = loansOutTotal > 0 ? fmt(loansOutTotal) : '';
-  if (loanOutItems.length === 0) {
+  if (consolidatedLoans.length === 0) {
     loansOutEl.innerHTML = '<p style="color:var(--text-dim);padding:8px 16px;font-size:13px;">No outstanding loans.</p>';
   } else {
-    loansOutEl.innerHTML = loanOutItems.map(item => `
-      <div style="display:flex;justify-content:space-between;align-items:center;padding:8px 10px;border-bottom:1px solid var(--border);font-size:13px;gap:8px;">
+    loansOutEl.innerHTML = consolidatedLoans.map((item, idx) => {
+      const countNote = item.count > 1 ? ` (${item.count} txns)` : '';
+      const paybackNote = item.payback > 0 ? `<div style="color:var(--green-dark);font-size:10px;">Payback: -${fmt(item.payback)} → Net: ${fmt(item.netAmount)}</div>` : '';
+      const ids = item.recordIds.join(',');
+      const isoDate = item.date.toISOString().slice(0, 10);
+      return `
+      <div id="loan-out-${idx}" style="display:flex;justify-content:space-between;align-items:center;padding:8px 10px;border-bottom:1px solid var(--border);font-size:13px;gap:8px;">
         <div style="min-width:0;flex:1;">
-          <div style="font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${item.desc}</div>
+          <div class="loan-out-display" style="display:flex;align-items:center;gap:4px;">
+            <span style="font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${item.desc}${countNote}</span>
+            <button onclick="editLoanOut(${idx}, '${ids}', '${(item.name||'').replace(/'/g,"\\'")}', ${item.amount}, '${isoDate}')" style="background:none;border:none;cursor:pointer;font-size:12px;padding:2px;opacity:0.5;" title="Edit loan name/amount/date">✏️</button>
+          </div>
           <div style="color:var(--text-dim);font-size:11px;">${item.date.toLocaleDateString('en-US', {month:'short',day:'numeric',year:'numeric'})}</div>
+          ${paybackNote}
         </div>
-        <div style="font-weight:600;color:#f59e0b;white-space:nowrap;">${fmt(item.amount)}</div>
-      </div>
-    `).join('');
+        <div style="font-weight:600;color:#f59e0b;white-space:nowrap;">${fmt(item.netAmount)}</div>
+      </div>`;
+    }).join('');
   }
 
   // Render Deposits section
@@ -3911,6 +4082,55 @@ async function saveNewLiability() {
     showToast('Liability added');
     await loadBalanceSheet();
   } catch(e) { showToast('Error: ' + e.message); }
+}
+
+// ── Edit Loan Out (name, amount, date) ──
+function editLoanOut(idx, idsStr, currentName, currentAmount, currentDate) {
+  const el = document.getElementById(`loan-out-${idx}`);
+  if (!el) return;
+  const ids = idsStr.split(',').filter(Boolean);
+  el.innerHTML = `
+    <div style="display:flex;flex-wrap:wrap;gap:6px;align-items:center;width:100%;padding:4px 0;">
+      <input id="loanEditName-${idx}" type="text" value="${currentName}" placeholder="Loan name"
+        style="flex:1;min-width:120px;font-size:12px;padding:4px 8px;border:1px solid var(--border);border-radius:4px;background:var(--surface2);color:var(--text);" />
+      <input id="loanEditAmount-${idx}" type="number" value="${currentAmount}" step="0.01" placeholder="Amount"
+        style="width:100px;font-size:12px;padding:4px 8px;border:1px solid var(--border);border-radius:4px;background:var(--surface2);color:var(--text);" />
+      <input id="loanEditDate-${idx}" type="date" value="${currentDate || ''}" style="font-size:12px;padding:4px 8px;border:1px solid var(--border);border-radius:4px;background:var(--surface2);color:var(--text);" />
+      <button onclick="saveLoanOutEdit(${idx}, '${idsStr}')" style="font-size:12px;padding:4px 10px;background:var(--accent);color:#fff;border:none;border-radius:4px;cursor:pointer;">Save</button>
+      <button onclick="loadBalanceSheet()" style="font-size:12px;padding:4px 10px;background:var(--surface2);color:var(--text);border:1px solid var(--border);border-radius:4px;cursor:pointer;">Cancel</button>
+    </div>`;
+}
+
+async function saveLoanOutEdit(idx, idsStr) {
+  const ids = idsStr.split(',').filter(Boolean);
+  const name = document.getElementById(`loanEditName-${idx}`).value.trim();
+  const amount = parseFloat(document.getElementById(`loanEditAmount-${idx}`).value);
+  const dateVal = document.getElementById(`loanEditDate-${idx}`).value;
+  if (!name) { showToast('Name required'); return; }
+
+  try {
+    // Update all records in this group with new name
+    for (const id of ids) {
+      const updates = { category_name: name };
+      categoryNames[id] = name;
+      if (dateVal) updates.date = dateVal;
+      await supaWrite('exec_transactions', 'PATCH', updates, `?id=eq.${id}`);
+    }
+    // If amount changed and it's a single record, update the amount
+    if (ids.length === 1 && !isNaN(amount) && amount > 0) {
+      await supaWrite('exec_transactions', 'PATCH', { amount: -Math.abs(amount) }, `?id=eq.${ids[0]}`);
+      // Update local allRecords
+      const rec = allRecords.find(r => r.id === ids[0]);
+      if (rec) {
+        if (rec.Amount !== undefined) rec.Amount = -Math.abs(amount);
+        else if (rec.amount !== undefined) rec.amount = -Math.abs(amount);
+      }
+    }
+    showToast('Loan updated');
+    loadBalanceSheet();
+  } catch(e) {
+    showToast('Error: ' + e.message, 'error');
+  }
 }
 
 function openEditLiability(recordId) {
