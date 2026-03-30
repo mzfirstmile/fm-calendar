@@ -137,7 +137,7 @@ The embedded Claude chat has access to these tools:
 - 132-40 Metropolitan Ave: 7.47% ownership, $400K contributed, ~$1.12M NOI (2026, excl RET pass-throughs), ~$1.39M NOI (2027 per Morris), 6% cap rate, $15.085M mortgage. Position value ≈ $273K = ((NOI/cap) - mortgage) × equity%
 - 132-40 Metropolitan budget format is tenant-by-tenant (not GL summary) — parsed by aggregating income categories (Rent→4010, RET→4120, CAM→4110, Insurance Recovery→4130, W/S Recovery→4140) across all tenants, then mapping expenses to GL codes. Budget file: `data/2026 Budget/Metropolitan *.xlsx`
 - RET (Real Estate Tax Recovery) is a pass-through — tenants reimburse RE tax, so it offsets the expense. Exclude from NOI calculations (GL 4120). Same principle for Insurance Recovery (4130) and W/S Recovery (4140) if material.
-- SQL migrations should be run via the admin website (admin.firstmilecap.com), NOT via Supabase dashboard directly
+- SQL migrations should be run via the admin website (admin.firstmilecap.com → SQL Console), NOT via Supabase dashboard directly. Claude CAN and SHOULD run SQL itself using the browser (Chrome MCP tools) — navigate to localhost:8000/#sql or admin.firstmilecap.com/#sql, paste into textarea, click Run. Do NOT ask Morris to run SQL manually.
 - Category dropdown in drilldowns is grouped into sections: 💰 Income, 📋 Expenses, 📊 Balance Sheet, 🔄 Other — uses `<optgroup>` with `buildCategoryOptions()` helper
 - "Investor Contribution (Pass-Through)" removed from dropdown — everything merged into "Investment Contributions"
 - Loan Out / Deposit drilldown rows have inline editable name field (persists to `category_name` column) + category dropdown
