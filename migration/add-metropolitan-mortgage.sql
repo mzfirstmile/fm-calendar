@@ -10,5 +10,5 @@ WHERE property_id = 'prop_132_40_metropolitan'
   AND (bs_code = '2100' OR lower(account_name) LIKE '%mortgage%');
 
 -- Insert mortgage
-INSERT INTO balance_sheet_items (property_id, bs_code, amount, account_section, account_name, is_header, is_total)
-VALUES ('prop_132_40_metropolitan', '2100', 15085000, 'Liabilities', 'Mortgage Payable', false, false);
+INSERT INTO balance_sheet_items (property_id, bs_code, account_name, account_type, account_section, is_header, is_total, period, amount, sort_order)
+VALUES ('prop_132_40_metropolitan', '2100', 'Mortgage Payable', 'liability', 'Liabilities', false, false, '2025-12', 15085000, 100);
