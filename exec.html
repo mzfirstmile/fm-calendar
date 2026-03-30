@@ -221,6 +221,7 @@
   .review-group-rows.open { display:block; }
   .review-txn { display:grid; grid-template-columns:1fr 140px 140px 130px 100px 36px; gap:6px; align-items:center; padding:8px 0; border-bottom:1px solid var(--border); font-size:13px; }
   .review-txn .review-link { font-size:10px; }
+  .review-txn .review-link-slot { display:contents; }
   .review-txn .review-ok-btn { width:30px; height:30px; border-radius:50%; border:1px solid var(--border); background:var(--surface); cursor:pointer; font-size:13px; display:flex; align-items:center; justify-content:center; transition:all .15s; color:var(--text-dim); }
   .review-txn .review-ok-btn:hover { background:var(--green);color:#fff;border-color:var(--green); }
   .review-txn:last-child { border-bottom:none; }
@@ -2675,7 +2676,7 @@ function closeUploadReview() {
 // Generic/catch-all categories that indicate a transaction needs manual review
 const GENERIC_CATEGORIES = new Set([
   'Other Income', 'Other Operating', 'Wire Payments', 'Checks',
-  'Investment Income', 'Credit Cards', 'Banking'
+  'Credit Cards', 'Banking'
 ]);
 
 // Categories that should be linked to a property, investment, or liability
@@ -2802,29 +2803,16 @@ function renderReviewPanel() {
       const dateStr = t.date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
 
       // Build linking dropdown based on category
-      let linkHtml = '<div class="review-link"></div>'; // empty placeholder for grid alignment
-      if (t.needsPropLink) {
-        const propOpts = [`<option value="">— Property —</option>`];
-        bsProperties.forEach(p => { propOpts.push(`<option value="${p.id}">${p.property_name}</option>`); });
-        linkHtml = `<select class="txn-cat-select review-link" onchange="reviewLinkProperty('${t.id}', this.value)">${propOpts.join('')}</select>`;
-      } else if (t.needsInvLink) {
-        const invOpts = [`<option value="">— Investment —</option>`];
-        bsInvestments.forEach(inv => { invOpts.push(`<option value="${inv.id}">${inv.name}</option>`); });
-        linkHtml = `<select class="txn-cat-select review-link" onchange="reviewLinkInvestment('${t.id}', this.value)">${invOpts.join('')}</select>`;
-      } else if (t.needsLiabLink) {
-        const liabOpts = [`<option value="">— Loan —</option>`];
-        bsLiabilities.forEach(l => { liabOpts.push(`<option value="${l.id}">${l.lender}${l.relatedDeal ? ' — ' + l.relatedDeal : ''}</option>`); });
-        linkHtml = `<select class="txn-cat-select review-link" onchange="reviewLinkLiability('${t.id}', this.value)">${liabOpts.join('')}</select>`;
-      }
+      const linkHtml = buildReviewLinkDropdown(t.id, t.autoCategory);
 
       html += `
-        <div class="review-txn">
+        <div class="review-txn" data-review-id="${t.id}">
           <div class="review-desc" title="${t.desc}">${dateStr} — ${t.desc}</div>
           <div class="review-acct">${t.acct}</div>
           <select class="txn-cat-select" onchange="reviewChangeCategory('${t.id}', this.value)" style="font-size:11px;">
             ${buildCategoryOptions(t.autoCategory)}
           </select>
-          ${linkHtml}
+          <div class="review-link-slot" data-link-for="${t.id}">${linkHtml}</div>
           <div class="review-amt ${amtClass}">${amtStr}</div>
           <button class="review-ok-btn" onclick="reviewDismiss('${t.id}')" title="Mark as OK — remove from review">✓</button>
         </div>`;
@@ -2844,6 +2832,24 @@ function toggleReviewGroup(catName, headerEl) {
   headerEl.querySelector('.review-chevron').textContent = rows.classList.contains('open') ? '▼' : '▶';
 }
 
+function buildReviewLinkDropdown(recordId, category) {
+  // Returns HTML for the appropriate linking dropdown based on category
+  if (LINKABLE_TO_PROPERTY.has(category)) {
+    const propOpts = [`<option value="">— Property —</option>`];
+    bsProperties.forEach(p => { propOpts.push(`<option value="${p.id}">${p.property_name}</option>`); });
+    return `<select class="txn-cat-select review-link" onchange="reviewLinkProperty('${recordId}', this.value)">${propOpts.join('')}</select>`;
+  } else if (LINKABLE_TO_INVESTMENT.has(category)) {
+    const invOpts = [`<option value="">— Investment —</option>`];
+    bsInvestments.forEach(inv => { invOpts.push(`<option value="${inv.id}">${inv.name}</option>`); });
+    return `<select class="txn-cat-select review-link" onchange="reviewLinkInvestment('${recordId}', this.value)">${invOpts.join('')}</select>`;
+  } else if (LINKABLE_TO_LIABILITY.has(category)) {
+    const liabOpts = [`<option value="">— Loan —</option>`];
+    bsLiabilities.forEach(l => { liabOpts.push(`<option value="${l.id}">${l.lender}${l.relatedDeal ? ' — ' + l.relatedDeal : ''}</option>`); });
+    return `<select class="txn-cat-select review-link" onchange="reviewLinkLiability('${recordId}', this.value)">${liabOpts.join('')}</select>`;
+  }
+  return '<div class="review-link"></div>';
+}
+
 async function reviewChangeCategory(recordId, newCategory) {
   categoryOverrides[recordId] = newCategory;
   let friendlyName = null;
@@ -2852,8 +2858,10 @@ async function reviewChangeCategory(recordId, newCategory) {
     if (friendlyName && friendlyName.trim()) categoryNames[recordId] = friendlyName.trim();
   }
   showToast(`Category → ${newCategory}`);
+  // Update the linking dropdown inline — don't re-render the whole panel
+  const linkSlot = document.querySelector(`[data-link-for="${recordId}"]`);
+  if (linkSlot) linkSlot.innerHTML = buildReviewLinkDropdown(recordId, newCategory);
   updateReviewBadge();
-  renderReviewPanel();
   try {
     const patchData = { category_override: newCategory };
     if (friendlyName && friendlyName.trim()) patchData.category_name = friendlyName.trim();
@@ -2867,7 +2875,6 @@ async function reviewLinkProperty(recordId, propertyId) {
   else delete propertyLinks[recordId];
   showToast(propertyId ? 'Linked to property' : 'Unlinked');
   updateReviewBadge();
-  renderReviewPanel();
   try { await supaWrite('exec_transactions', 'PATCH', { property_id: propertyId || null }, `?id=eq.${recordId}`); }
   catch(e) { showToast(`⚠️ Save failed: ${e.message}`, 'error'); }
 }
@@ -2877,7 +2884,6 @@ async function reviewLinkInvestment(recordId, investmentId) {
   else delete investmentLinks[recordId];
   showToast(investmentId ? 'Linked to investment' : 'Unlinked');
   updateReviewBadge();
-  renderReviewPanel();
   try { await supaWrite('exec_transactions', 'PATCH', { investment_id: investmentId || null }, `?id=eq.${recordId}`); }
   catch(e) { showToast(`⚠️ Save failed: ${e.message}`, 'error'); }
 }
@@ -2887,7 +2893,6 @@ async function reviewLinkLiability(recordId, liabilityId) {
   else delete liabilityLinks[recordId];
   showToast(liabilityId ? 'Linked to loan' : 'Unlinked');
   updateReviewBadge();
-  renderReviewPanel();
   try { await supaWrite('exec_transactions', 'PATCH', { liability_id: liabilityId || null }, `?id=eq.${recordId}`); }
   catch(e) { showToast(`⚠️ Save failed: ${e.message}`, 'error'); }
 }
