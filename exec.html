@@ -225,7 +225,10 @@
   .review-txn .review-ok-btn { width:30px; height:30px; border-radius:50%; border:1px solid var(--border); background:var(--surface); cursor:pointer; font-size:13px; display:flex; align-items:center; justify-content:center; transition:all .15s; color:var(--text-dim); }
   .review-txn .review-ok-btn:hover { background:var(--green);color:#fff;border-color:var(--green); }
   .review-txn:last-child { border-bottom:none; }
-  .review-txn .review-desc { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; cursor:help; }
+  .review-txn .review-desc { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; cursor:help; position:relative; }
+  .review-txn .review-desc:hover { overflow:visible; }
+  .review-txn .review-desc .txn-tooltip { display:none; position:absolute; left:0; top:calc(100% + 4px); background:var(--text); color:#fff; padding:10px 14px; border-radius:8px; font-size:12px; white-space:normal; word-break:break-word; max-width:600px; min-width:300px; z-index:200; box-shadow:0 4px 16px rgba(0,0,0,.25); line-height:1.5; pointer-events:none; }
+  .review-txn .review-desc:hover .txn-tooltip { display:block; }
   .review-txn .review-acct { font-size:11px; color:var(--text-dim); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
   .review-txn .review-amt { text-align:right; font-weight:600; font-variant-numeric:tabular-nums; }
   .review-txn .review-amt.green { color:var(--green-dark); }
@@ -2807,7 +2810,7 @@ function renderReviewPanel() {
 
       html += `
         <div class="review-txn" data-review-id="${t.id}">
-          <div class="review-desc" title="${t.desc}">${dateStr} — ${t.desc}</div>
+          <div class="review-desc">${dateStr} — ${t.desc}<span class="txn-tooltip">${t.desc}</span></div>
           <div class="review-acct">${t.acct}</div>
           <select class="txn-cat-select" onchange="reviewChangeCategory('${t.id}', this.value)" style="font-size:11px;">
             ${buildCategoryOptions(t.autoCategory)}
