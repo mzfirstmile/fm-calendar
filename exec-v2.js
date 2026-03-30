@@ -672,8 +672,8 @@ function _injectHTML() {
   <div class="modal" id="modalContent"></div>
 </div>
 
-<!-- Local dev: config.js sets Supabase vars (gitignored, won't exist in prod) -->
-<script src="config.js" onerror=""></script>`;
+`;
+  // config.js already loaded by parent — no need to re-inject
 }
 
 // ── All module JS ──
@@ -825,14 +825,10 @@ window.addEventListener('popstate', function(e) {
 // Auth handled by parent site's Microsoft SSO; Supabase uses anon key
 
 // Auto-init (auth handled by parent site's Microsoft SSO)
-initDashboard();
-
-// ── Init ──
-function initDashboard() {
-  // Category overrides loaded from Supabase in loadData()
-  // Payroll splits matched by amount after data loads (see matchPayrollSplits)
+// initDashboard moved into exec2Init — don't auto-run at parse time
+async function initDashboard() {
   payrollSplits = {};
-  loadData();
+  await loadData();
 }
 
 // Redraw chart on resize
@@ -842,8 +838,9 @@ window.addEventListener('resize', () => { clearTimeout(resizeTimer); resizeTimer
 // ── Data Fetch ──
 async function loadData() {
   const bar = document.getElementById('loadBar');
-  bar.className = 'loading-bar active';
-  document.getElementById('dashboard').classList.add('show');
+  if (bar) bar.className = 'loading-bar active';
+  const dash = document.getElementById('dashboard');
+  if (dash) dash.classList.add('show');
 
   try {
     // Fetch transactions from Supabase, filter to 2026+ corporate accounts
@@ -882,7 +879,7 @@ async function loadData() {
     console.log(`Loaded ${raw.length} rows, filtered to ${allRecords.length} corporate accounts, ${Object.keys(categoryOverrides).length} overrides`);
     // Match known payroll splits to actual Supabase record IDs by transaction amount
     matchPayrollSplits();
-    bar.className = 'loading-bar done';
+    if (bar) bar.className = 'loading-bar done';
 
     // Restore view state from URL hash (survives page refresh)
     const saved = loadStateFromHash();
@@ -908,9 +905,8 @@ async function loadData() {
     }
     loadBalanceSheet();
   } catch (e) {
-    bar.className = 'loading-bar';
-    console.error(e);
-    alert('Failed to load data: ' + e.message);
+    if (bar) bar.className = 'loading-bar';
+    console.error('Failed to load data:', e);
   }
 }
 
@@ -1326,6 +1322,7 @@ function renderAll() {
 // ── Render Net Income (P&L) Chart ──
 function renderChart() {
   const container = document.getElementById('cfChart');
+  if (!container) return;
   if (periods.length === 0) { container.innerHTML = '<p style="color:var(--text-dim);text-align:center;padding:40px;">No data</p>'; return; }
 
   // Compute net income per period
@@ -1966,11 +1963,16 @@ function openDrilldown(type, cssClass) {
 function closeDrilldown(skipHistoryBack) {
   currentDrilldownType = null;
   currentDrilldownCssClass = null;
-  document.getElementById('drilldown').classList.remove('show');
-  document.getElementById('incomeSection').style.display = '';
-  document.getElementById('opexSection').style.display = '';
-  document.getElementById('bsItemsSection').style.display = '';
-  document.querySelector('.excluded-section').style.display = '';
+  const dd = document.getElementById('drilldown');
+  if (dd) dd.classList.remove('show');
+  const is = document.getElementById('incomeSection');
+  if (is) is.style.display = '';
+  const os = document.getElementById('opexSection');
+  if (os) os.style.display = '';
+  const bs = document.getElementById('bsItemsSection');
+  if (bs) bs.style.display = '';
+  const ex = document.querySelector('.excluded-section');
+  if (ex) ex.style.display = '';
   saveStateToHash();
 }
 
@@ -3316,26 +3318,26 @@ async function fetchNOIFromBudget() {
   } catch(e) { console.error('Failed to fetch NOI from budget:', e); return {}; }
 }
 
-// Request NOI — from parent if in iframe, else fetch directly
-if (isInIframe) {
-  try { window.propertyNOI = getParentNOI(); } catch(e) {}
-  // Fallback: if NOI doesn't arrive within 3s, fetch directly
-  setTimeout(async () => {
-    if (!noiReceived) {
-      propertyNOI = await fetchNOIFromBudget();
+// Request NOI — deferred until after init injects HTML
+function _initNOI() {
+  if (isInIframe) {
+    try { window.propertyNOI = getParentNOI(); } catch(e) {}
+    setTimeout(async () => {
+      if (!noiReceived) {
+        propertyNOI = await fetchNOIFromBudget();
+        noiReceived = true;
+        console.log('Fetched NOI directly from budget:', propertyNOI);
+        loadBalanceSheet();
+      }
+    }, 3000);
+  } else {
+    fetchNOIFromBudget().then(noi => {
+      propertyNOI = noi;
       noiReceived = true;
-      console.log('Fetched NOI directly from budget:', propertyNOI);
+      console.log('Fetched NOI directly from budget (standalone):', propertyNOI);
       loadBalanceSheet();
-    }
-  }, 3000);
-} else {
-  // Standalone mode — fetch NOI directly on load
-  fetchNOIFromBudget().then(noi => {
-    propertyNOI = noi;
-    noiReceived = true;
-    console.log('Fetched NOI directly from budget (standalone):', propertyNOI);
-    loadBalanceSheet();
-  });
+    });
+  }
 }
 
 async function loadBalanceSheet() {
@@ -4355,13 +4357,48 @@ async function saveManualAsset(assetType) {
   }
 }
 
+// ── Expose functions for inline onclick/onchange handlers ──
+const _exposeFns = {
+  closeModal, closeReviewPanel, closeUploadModal, closeUploadReview,
+  confirmDeleteInvestment, confirmDeleteLiability, confirmImport,
+  editLoanOut, loadBalanceSheet, nextPeriod,
+  openAddInvestment, openAddLiability, openAddManualAsset, openDrilldown,
+  openReviewUncategorized, openUploadModal, prevPeriod,
+  proceedToUploadReview, refreshData, reviewDismiss,
+  saveCapRate, saveDistributed, saveEditInvestment, saveEditLiability,
+  saveLoanOutEdit, saveManualAsset, saveNewInvestment, saveNewLiability,
+  selectPeriod, sendChat, setCfMode, setReviewFilter,
+  toggleChat, toggleInvCard, toggleLiabCard, toggleReviewGroup,
+  changeCategory, filterRevenueByProperty, handleCsvUpload,
+  linkToInvestment, linkToLiability, linkToLoan, linkToPropOrInv,
+  onPropertyLinkChange, reviewChangeCategory, reviewLinkInvestment,
+  reviewLinkLiability, reviewLinkLoan, reviewLinkPropOrInv,
+  updateLoanName, uploadChangeCategory, uploadLinkInvestment,
+  uploadLinkLiability, uploadLinkProperty,
+  saveAssetValue, editAssetValue, editCapRate, editDistributed,
+  openEditInvestment, openEditLiability
+};
+Object.entries(_exposeFns).forEach(([name, fn]) => { window[name] = fn; });
+
+// ── Auto-init if exec2 view is already active (script loaded after switchView) ──
+if (document.getElementById('view-exec2')?.classList.contains('show')) {
+  setTimeout(() => { if (!_exec2Inited) window.exec2Init(); }, 0);
+}
+
 // ── Public init function ──
 window.exec2Init = async function() {
-  if (_exec2Inited) return;
+  // Re-inject HTML if root is empty (e.g. previous init failed)
+  const root = document.getElementById('exec2Root');
+  if (_exec2Inited && root && root.childElementCount > 0) return;
   _exec2Inited = true;
   _injectCSS();
   _injectHTML();
-  await exec2InitData();
+  if (!document.getElementById('periodTitle')) {
+    console.error('[exec2] HTML injection failed — periodTitle not found after _injectHTML');
+    return;
+  }
+  _initNOI();
+  await initDashboard();
 };
 
 })();

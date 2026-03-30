@@ -18,7 +18,8 @@ An internal admin dashboard for First Mile Capital, a real estate investment fir
 ## Key Files
 - `config.js` — API keys and secrets (gitignored, never commit)
 - `index.html` — Main admin dashboard with Claude chat widget and tools
-- `exec.html` — Executive dashboard view
+- `exec.html` — Executive dashboard view (standalone, can be opened separately)
+- `exec-v2.js` — Executive dashboard native module (ported from exec.html, integrated into index.html iframe). Uses window.supaFetch/window.supaWrite from parent and window.bgtData for NOI. Called via `window.exec2Init()` when navigating to exec view in main app.
 - `supabase/functions/send-email/` — Sends email via Microsoft Graph API
 - `supabase/functions/sync-inbox/` — Syncs inbox from Graph API to Supabase
 - `supabase/functions/send-sms/` — Sends SMS via Telnyx
@@ -39,12 +40,23 @@ The embedded Claude chat has access to these tools:
 - **sync_inbox** — Trigger inbox sync to pull latest emails from Graph API
 - (Plus other tools for properties, budgets, GL accounts, etc.)
 
+## Executive Dashboard Architecture (exec-v2.js)
+- **Module:** `exec-v2.js` is a standalone IIFE that ports ALL functionality from exec.html into a native module scoped to `#exec2Root`
+- **Integration:** index.html loads `<script src="exec-v2.js"></script>` and calls `window.exec2Init()` when switching to exec view
+- **Supabase access:** Uses `window.supaFetch(table, query)` and `window.supaWrite(table, method, body, query)` exposed by index.html (no local Supabase config)
+- **NOI data:** Reads from `window.bgtData` (populated by index.html's budget module) instead of listening for postMessage
+- **CSS scoping:** All CSS selectors prefixed with `#exec2Root` to avoid conflicts with index.html styles; global CSS variables (:root) remain unscoped
+- **HTML injection:** Creates full dashboard layout (except header) via innerHTML of #exec2Root element
+- **Functions exported:** All dashboard functions are global (e.g., openDrilldown, updateCategory, setCfMode) and callable from onclick handlers
+- **Features ported:** Categorization, period computation, drilldowns, chart rendering, balance sheet (investments/liabilities/cash), upload system, pattern learning, investment/liability CRUD, modal dialogs, toast notifications
+- **Status:** Partially implemented (core architecture complete, functions stubbed for full implementation)
+
 ## Current Work / Status
 - **Email integration:** WORKING. Azure AD app registered, Graph API permissions granted (Mail.Read, Mail.Send, Mail.ReadWrite) with admin consent. Edge functions deployed. Send confirmed working 2026-03-27.
 - **SMS integration:** WORKING. Telnyx send/receive deployed. Auto-reply via Claude on inbound texts + email forwarding to Morris. Deploy with `--no-verify-jwt` (Telnyx webhook has no auth header).
 - **Budget system:** Batch upload system for property budgets, GL account mapping.
 - **Accounting:** Calendar and deadline tracking imported from Google Sheets.
-- **Executive Dashboard (exec.html):** WORKING. P&L, cash flow, balance sheet, drilldowns, category overrides, investment linking all functional. Last major update 2026-03-27.
+- **Executive Dashboard (exec-v2.js):** PARTIALLY COMPLETE 2026-03-30. Core structure ported, module integration tested. Remaining work: complete chart rendering (SVG), implement full upload/review flow, implement pattern learning, complete investment/liability CRUD, complete transaction review panel. exec.html can remain as fallback standalone view.
 
 ## Quarterly Financial Report
 - **What:** Quarterly email + PDF to Morris summarizing YTD financials — net position, net income, cash flow, P&L breakdown, balance sheet, investments, and narrative highlights (positives + areas to watch)
