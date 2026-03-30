@@ -3085,11 +3085,41 @@ window.addEventListener('message', function(e) {
     loadData();
   }
 });
-// Request NOI from parent when iframe loads
+// Fetch NOI directly from budget_line_items GL 6999 (pre-computed NOI row)
+async function fetchNOIFromBudget() {
+  try {
+    const rows = await supaFetch('budget_line_items', '?year=eq.2026&gl_code=eq.6999&select=property_id,amount');
+    if (!rows || rows.length === 0) return {};
+    const noiMap = {};
+    rows.forEach(r => {
+      if (!r.property_id) return;
+      if (!noiMap[r.property_id]) noiMap[r.property_id] = 0;
+      noiMap[r.property_id] += r.amount || 0;
+    });
+    return noiMap;
+  } catch(e) { console.error('Failed to fetch NOI from budget:', e); return {}; }
+}
+
+// Request NOI — from parent if in iframe, else fetch directly
 if (isInIframe) {
   try { window.parent.postMessage({ type: 'requestNOI' }, '*'); } catch(e) {}
-  // Fallback: if NOI doesn't arrive within 3s, show whatever we have
-  setTimeout(() => { if (!noiReceived) { noiReceived = true; loadBalanceSheet(); } }, 3000);
+  // Fallback: if NOI doesn't arrive within 3s, fetch directly
+  setTimeout(async () => {
+    if (!noiReceived) {
+      propertyNOI = await fetchNOIFromBudget();
+      noiReceived = true;
+      console.log('Fetched NOI directly from budget:', propertyNOI);
+      loadBalanceSheet();
+    }
+  }, 3000);
+} else {
+  // Standalone mode — fetch NOI directly on load
+  fetchNOIFromBudget().then(noi => {
+    propertyNOI = noi;
+    noiReceived = true;
+    console.log('Fetched NOI directly from budget (standalone):', propertyNOI);
+    loadBalanceSheet();
+  });
 }
 
 async function loadBalanceSheet() {
