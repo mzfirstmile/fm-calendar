@@ -1026,6 +1026,7 @@
       </div>
       <div class="cal-team-filters" id="calTeamFilters"></div>
       <div class="cal-filters" id="calFilters"></div>
+      <div class="cal-type-filters" id="calTypeFilters" style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;padding:4px 0;"></div>
       <div class="cal-grid" id="calGrid"></div>
       <div id="calTaskTable" class="cal-task-table"></div>
       <div class="cal-tooltip" id="calTooltip"></div>
@@ -2317,11 +2318,38 @@ $$;</pre></div>`;
       return `<div class="cal-chip${on ? ' on' : ''}" style="${on ? `background:${c};border-color:${c};` : ''}" onclick="calSelectProp('${p.replace(/'/g,"\\'")}')">${p}</div>`;
     }).join('');
     el.innerHTML = html;
+
+    // Type filters
+    const typeEl = document.getElementById('calTypeFilters');
+    const filteredForType = calSelectedTeam ? calEvents.filter(e => e.teams.includes(calSelectedTeam)) : calEvents;
+    const filteredForType2 = calSelectedProp ? filteredForType.filter(e => e.property === calSelectedProp) : filteredForType;
+    const types = [...new Set(filteredForType2.filter(e => e.type).map(e => e.type))].sort();
+    if (types.length > 1) {
+      const allTypesOn = calSelectedType === null;
+      let typeHtml = `<span style="font-size:11px;font-weight:600;color:var(--text-dim);margin-right:2px;">Type</span>`;
+      typeHtml += `<div class="cal-team-chip${allTypesOn ? ' on' : ''}" style="font-size:11px;padding:2px 8px;${allTypesOn ? 'background:var(--accent);border-color:var(--accent);color:#fff;' : ''}" onclick="calSelectType(null)">All</div>`;
+      typeHtml += types.map(t => {
+        const on = calSelectedType === t;
+        return `<div class="cal-team-chip${on ? ' on' : ''}" style="font-size:11px;padding:2px 8px;${on ? 'background:var(--accent);border-color:var(--accent);color:#fff;' : ''}" onclick="calSelectType('${t.replace(/'/g,"\\'")}')">${t}</div>`;
+      }).join('');
+      typeEl.innerHTML = typeHtml;
+      typeEl.style.display = 'flex';
+    } else {
+      typeEl.innerHTML = '';
+      typeEl.style.display = 'none';
+    }
+  }
+
+  function calSelectType(t) {
+    calSelectedType = (t === calSelectedType) ? null : t;
+    calBuildFilters();
+    calRender();
   }
 
   function calSelectTeam(t) {
     if (t === calSelectedTeam) { calSelectedTeam = null; } else { calSelectedTeam = t; }
     calSelectedProp = null; // reset property filter on team change
+    calSelectedType = null; // reset type filter on team change
     const allProps = [...new Set(calEvents.map(e => e.property))];
     calFiltersActive = new Set(allProps);
     calBuildFilters();
@@ -2349,10 +2377,11 @@ $$;</pre></div>`;
     const today = new Date();
     const isCurrentMonth = today.getFullYear() === year && today.getMonth() === m;
 
-    // Filter events for this month (by team + property) — exclude terminated
+    // Filter events for this month (by team + property + type) — exclude terminated
     let visible = calEvents.filter(e => e.status !== 'Terminated' && calFiltersActive.has(e.property));
     if (calSelectedTeam) visible = visible.filter(e => e.teams.includes(calSelectedTeam));
     if (calSelectedProp) visible = visible.filter(e => e.property === calSelectedProp);
+    if (calSelectedType) visible = visible.filter(e => e.type === calSelectedType);
     const monthly = visible.filter(e => e.cadence === 'Monthly');
     const quarterly = visible.filter(e => e.cadence === 'Quarterly' && [0,3,6,9].includes(m));
     const annual = visible.filter(e => e.cadence === 'Annual' && e.dueMonth && (e.dueMonth - 1) === m);
@@ -2409,6 +2438,7 @@ $$;</pre></div>`;
     let terminatedVisible = calEvents.filter(e => e.status === 'Terminated' && calFiltersActive.has(e.property));
     if (calSelectedTeam) terminatedVisible = terminatedVisible.filter(e => e.teams.includes(calSelectedTeam));
     if (calSelectedProp) terminatedVisible = terminatedVisible.filter(e => e.property === calSelectedProp);
+    if (calSelectedType) terminatedVisible = terminatedVisible.filter(e => e.type === calSelectedType);
     const termCount = terminatedVisible.length;
     // Apply cadence filter (default: recurring)
     let cadenceFiltered;
