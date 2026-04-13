@@ -1721,6 +1721,8 @@
       '0 0 * * *': 'Daily at midnight',
       '0 0 * * 0': 'Weekly (Sunday midnight)',
       '0 0 1 * *': 'Monthly (1st at midnight)',
+      '0 12 * * *': 'Daily at 8:00 AM ET',
+      '0 13 * * *': 'Daily at 8:00 AM ET (EST)',
     };
     return presets[cron] || cron;
   }
