@@ -2598,7 +2598,9 @@ function proceedToUploadReview() {
       category: result.type,
       property_id: result.property_id || null,
       investment_id: result.investment_id || null,
-      liability_id: result.liability_id || null
+      liability_id: result.liability_id || null,
+      confidence: result.confidence,
+      userModified: false
     };
     return { ...txn, idx, ...result };
   });
@@ -2702,6 +2704,7 @@ function renderUploadTxnRow(t) {
 
 function uploadChangeCategory(idx, newCategory, selectEl) {
   uploadReviewChoices[idx].category = newCategory;
+  uploadReviewChoices[idx].userModified = true;
   // If category changed to one that needs a linking dropdown, re-render the row
   // (simpler to just re-render the whole review screen)
   const row = selectEl.closest('.upload-txn-row');
@@ -2783,6 +2786,8 @@ async function confirmImport() {
     row.property_id = choice.property_id || null;
     row.liability_id = choice.liability_id || null;
     row.category_name = null;
+    // Mark as reviewed if high confidence or user explicitly changed the category
+    row.reviewed = (choice.confidence === 'high' || choice.userModified) ? true : false;
     return row;
   });
 
@@ -2797,9 +2802,21 @@ async function confirmImport() {
     // Learn patterns from user categorizations
     await learnFromUpload();
 
-    showToast(`Imported ${successCount} transactions`);
-    closeUploadReview();
-    loadData(); // Refresh dashboard
+    // Count how many need review
+    const needsReviewCount = insertRows.filter(r => !r.reviewed).length;
+    showToast(`Imported ${successCount} transactions` + (needsReviewCount > 0 ? ` — ${needsReviewCount} need review` : ''));
+
+    // Close upload review panel
+    document.getElementById('uploadReview').classList.remove('show');
+
+    // Reload data, then open persistent review panel if there are items to review
+    await loadData();
+    if (needsReviewCount > 0) {
+      openReviewUncategorized();
+    } else {
+      document.getElementById('dashboard').classList.add('show');
+      renderPeriodDashboard();
+    }
   } catch(e) {
     console.error('Import error:', e);
     showToast(`⚠️ Import error: ${e.message}`, 'error');
@@ -2908,10 +2925,13 @@ function getExistingLoanNames() {
 let reviewFilterMode = 'all-review'; // 'all-review', 'uncategorized', 'unlinked', or specific account
 
 function getReviewItems() {
-  // Returns items that need review: uncategorized (generic) OR unlinked (missing property/investment/liability link)
+  // Returns items that need review:
+  // 1. Explicitly unreviewed (reviewed=false) — e.g. low/medium confidence imports
+  // 2. Uncategorized (generic auto-category, no override)
+  // 3. Unlinked (missing property/investment/liability link)
   const items = [];
   allRecords.forEach(r => {
-    if (reviewedItems[r.id]) return; // dismissed
+    if (reviewedItems[r.id]) return; // dismissed / reviewed
     const id = r.id;
     const effectiveCat = categoryOverrides[id] || categorize(r).type;
     const isGeneric = !categoryOverrides[id] && GENERIC_CATEGORIES.has(effectiveCat);
@@ -2921,14 +2941,15 @@ function getReviewItems() {
     const needsLoanLink = LINKABLE_TO_LOAN.has(effectiveCat) && !categoryNames[id];
     const needsLink = needsPropLink || needsInvLink || needsLiabLink || needsLoanLink;
 
-    if (isGeneric || needsLink) {
-      items.push({
-        id, date: getDate(r), desc: getDescription(r), acct: getAccountName(r),
-        amount: getAmount(r), autoCategory: effectiveCat,
-        isGeneric, needsLink, needsPropLink, needsInvLink, needsLiabLink, needsLoanLink,
-        reason: isGeneric ? 'uncategorized' : 'unlinked'
-      });
-    }
+    // Include ALL unreviewed items — not just generic/unlinked
+    // This ensures low/medium confidence uploads persist in the review panel
+    const reason = isGeneric ? 'uncategorized' : (needsLink ? 'unlinked' : 'unreviewed');
+    items.push({
+      id, date: getDate(r), desc: getDescription(r), acct: getAccountName(r),
+      amount: getAmount(r), autoCategory: effectiveCat,
+      isGeneric, needsLink, needsPropLink, needsInvLink, needsLiabLink, needsLoanLink,
+      reason
+    });
   });
   return items;
 }
@@ -2963,12 +2984,14 @@ function renderReviewPanel() {
   const allItems = getReviewItems();
   const uncategorizedItems = allItems.filter(t => t.isGeneric);
   const unlinkedItems = allItems.filter(t => t.needsLink && !t.isGeneric);
+  const unreviewedItems = allItems.filter(t => t.reason === 'unreviewed');
 
   // Build filter buttons
   let filtersHtml = `
     <button class="review-filter-btn ${reviewFilterMode === 'all-review' ? 'active' : ''}" onclick="setReviewFilter('all-review')">All (${allItems.length})</button>
     <button class="review-filter-btn ${reviewFilterMode === 'uncategorized' ? 'active' : ''}" onclick="setReviewFilter('uncategorized')">Uncategorized (${uncategorizedItems.length})</button>
     <button class="review-filter-btn ${reviewFilterMode === 'unlinked' ? 'active' : ''}" onclick="setReviewFilter('unlinked')">Needs Linking (${unlinkedItems.length})</button>
+    <button class="review-filter-btn ${reviewFilterMode === 'unreviewed' ? 'active' : ''}" onclick="setReviewFilter('unreviewed')">Needs Review (${unreviewedItems.length})</button>
   `;
   document.getElementById('reviewFilters').innerHTML = filtersHtml;
 
@@ -2977,6 +3000,7 @@ function renderReviewPanel() {
   if (reviewFilterMode === 'all-review') filtered = allItems;
   else if (reviewFilterMode === 'uncategorized') filtered = uncategorizedItems;
   else if (reviewFilterMode === 'unlinked') filtered = unlinkedItems;
+  else if (reviewFilterMode === 'unreviewed') filtered = unreviewedItems;
   else filtered = allItems.filter(t => t.acct === reviewFilterMode);
 
   // Group by category
