@@ -177,6 +177,101 @@ The embedded Claude chat has access to these tools:
 - **exec-v2 init sequence:** `_injectCSS()` → `_injectHTML()` → `_initNOI()` → `initDashboard()`. All must happen in this order. Auto-init at bottom of IIFE detects if view is already active when script loads (handles script-load-after-switchView race).
 - **1700 East Putnam and 575 Broadway** were added to exec_investments on 2026-03-30 (previously only in properties table, not tracked as investments). Both have ownership_pct=0 and valuation=0 — Morris needs to fill in actual values.
 
+## JV & Operating Agreement Summaries
+Key terms extracted from executed agreements. Use these to answer team questions and manage calendar tasks.
+
+### 340 Mt Kemble — FM Kemble Crown JV LLC Operating Agreement (Jan 17, 2025)
+- **Parties:** Manager = Balfin Americas LLC (CEO: Martin Mane); FM Member = First Mile Capital LLC (signed by Richard Chera)
+- **Structure:** Balfin is Manager + Member ($11M capital). FMC holds profits interest → converts to 10% economic interest after Balfin receives full return of capital (§2.1)
+- **Asset Management Fee:** 1% of all Capital Contributions ($11M), fixed at $110K/yr (~$9,167/mo). Paid monthly in arrears, after distributions. (§3.4a)
+- **Acquisition Fee:** 1% of Purchase Price to FM Member, paid at closing. (§3.4b)
+- **Distributions:** No less than quarterly. Waterfall: (i) first to Balfin until full return of capital, (ii) then 90% Balfin / 10% FMC. (§5.2)
+- **Reports (§9.2):** Manager delivers to Members upon request: (a) quarterly unaudited revenue/expense statements + Members' capital; (b) additional quarterly reports as reasonably requested
+- **Tax Info (§9.3):** Manager delivers tax info within 90 days after fiscal year-end (by ~March 31). If unable, deliver preliminary estimated info within that period.
+- **Fiscal Year:** Calendar year (§1.7u)
+- **Major Decisions requiring FMC consent (§3.3):** Amending certificate, issuing interests, bankruptcy, incurring debt, tax elections, acquisitions, admitting members, distributions, amending OA, affiliate payments
+- **No leverage** without unanimous consent of Members (§2.7)
+- **Transfers:** Balfin may sell interest upon notice to FMC (no ROFR) (§11.1)
+- **Governing Law:** Delaware (§14.7)
+- **Dispute Resolution:** Binding arbitration, AAA rules, NY or other mutually agreed location (§14.17)
+
+### 61 S Paramus — FM Paramus JV LLC Operating Agreement (Nov 15, 2023)
+- **Parties:** Managing Member = FM Paramus Member LLC; Investor Members = multiple (FM Capital, FM Pref Fund II, Futene/Hiroshi Tomashima, Hua Hu, C's USA/Richard Adler, Richard Chera, Hagireya/Yusuke Umeda)
+- **Asset Management Fee:** 2.0% per annum of weighted average daily balance of Investor Members' Capital Contributions. Calculated quarterly. (§4.2)
+- **Distributions:** All Available Cash distributed no less than monthly. Waterfall: (i) 100% pro rata until 6% IRR; (ii) 75/25 (Members/Manager) until 8% IRR; (iii) 60/40 thereafter. (§8.1, §8.2)
+- **Tax Distributions:** Manager may distribute to cover tax liabilities at max NYC individual rates (§8.4)
+- **Quarterly Reports (§5.1):** Within 60 days after end of first 3 calendar quarters — unaudited balance sheet, income statement, investment summary
+- **Annual Reports (§5.1):** Within 90 days after calendar year-end — annual unaudited financial statements, tax returns, current Business Plan and Budget
+- **K-1 Delivery (§9.4):** On or before March 31 each year (good faith efforts)
+- **Capital Calls:** Managing Member may call additional contributions; Investor Members must fund within 20 days of notice. Non-funding member loans at 8% (voluntary) or 14% (mandatory). (§6.2, §6.3)
+- **Meetings (§4.3):** Called by Managing Member anytime, 3 business days' notice minimum
+
+### Paramus Plaza — Property Management Agreement (FM Plaza Manager, dated 6/28/2024)
+- **Parties:** Owner = G&I XI Paramus Plaza Holdco LLC (DRA/Crown JV); Manager = FM Plaza Manager LLC
+- **Management Fee:** 3% of monthly Gross Income from space tenants. Due on 10th business day of month OR 10 biz days after report submission (whichever later). Late payment interest: 8%/yr. (§4a)
+- **Construction Management Fees:** $0-50K: 5% of direct costs; >$50K: 3%; max cap 10%. (§4c)
+- **Monthly Reports (Exhibit A, §2a):** Within 10 business days after month-end — executive summary, P&L, balance sheet, GL, aging, reconciliations, rent roll, delinquency, vacancy, construction status
+- **Quarterly Budget Variance (Exhibit A §5):** By 15th day after quarter-end — variance explanations
+- **Annual Reforecast:** Due September 1 — 7 months actual + 5 months projected
+- **Annual Budget:** Due October 1 (or Owner's set date) — operating & capital budgets
+- **Year-end CAM Reconciliation:** Within 8 weeks after year-end close (§2a-iii)
+- **Insurance:** Annual certificate review (§7f); Manager liability: $2M/occurrence, $3M aggregate
+- **Property Visits:** Minimum twice per week (§2a-i)
+- **Expense Submission:** Asset Manager submits itemized costs by 10th of each month; Owner reviews/funds by 15th (§3.7a-i)
+- **Vendor Bids:** 3 qualified bids required for work >$10K; Owner pre-approval for contracts >$10K (§2a-vii, §2a-viii)
+- **DRA JV Agreement files:** Corrupted/0 bytes in Dropbox — need executed copies
+
+### Paramus Plaza — FM Plaza JV LLC Operating Agreement
+- **Structure:** FM Plaza Manager LLC is Managing Member
+- **Distributions (§5.01):** Pro rata by Percentage Interests; amount/timing at Managing Member discretion; sufficient to cover tax obligations
+- **Tax (§9):** Partnership treatment; Managing Member is tax matters representative
+- **Meetings (§2.07):** 10-60 days notice; called by Managing Member or 25%+ interest holders
+
+### 41 Flatbush — Asset Management Agreement (PCCP/Crown, July 3, 2023)
+- **Parties:** Owner = 41 Flatbush Equity LLC (PCCP as Managing Investor); Asset Manager = First Mile Capital LLC (FMC)
+- **Supervisory Fee:** 2.5% of Monthly Gross Collections (until Lease Threshold met), then 4% after threshold. Reverts to 2.5% if occupancy <65% for 6+ months. Paid monthly in arrears. Must pay within 10 days of due date. (§4.1)
+- **Lease Threshold:** 70% occupancy + 70% rent commencement (Blue State Digital excluded)
+- **Incentive Fee:** 7.5% of (purchase price exceeding $100M + all hard/soft costs). Due on Sale Closing Date. Pro-rated if terminated early. (§4.1)
+- **Monthly Reports (Schedule 2, §3.6b):** Within 30 days after month-end — bank statements, cash receipts/disbursements, trial balance, GL, invoices, payroll docs, operating statements (incl DSCR), rent roll, delinquency, lease status, construction status, executive summary
+- **Quarterly Reports (Schedule 2):** Within 45 days after end of Q1-Q3 — unaudited financials (balance sheet, income statement, sources/uses, prior year comparison, budget variance)
+- **Annual Reports (Schedule 2):** Within 120 days after year-end — unaudited financials (balance sheet, income statement, sources/uses)
+- **Annual Budget:** Due no later than October 31 — proposed operating budget for forthcoming year (§3.1c)
+- **Monthly Expense Submission:** By 10th of each month; Owner reviews/funds by 15th (§3.7a-i)
+- **Initial Term:** 18 months from July 3, 2023 (expired ~Jan 2025); then month-to-month. 30 days notice for no-cause termination. (§4.2)
+- **Post-Termination:** Final reports + books within 30 days; original records within 10 days (§4.3d)
+
+### 1700 East Putnam — PMA (Crown as PM)
+- **Monthly Reports:** Collections, delinquencies, vacancies, budget variances, receivables/payables to FMC
+- **Annual Budget:** Due no later than November 15
+- **Year-end CAM/Escalation Reconciliation:** Within 8 weeks after year-end close
+- **PM Fee:** Due on 10th business day of month (or 10 biz days after report submission)
+- **JV Agreements:** Empty folder in Dropbox — no JV OA on file
+
+### 575 Broadway — PMA (Crown as PM)
+- **Monthly Reports:** Cash collections & A/R (due 15th); monthly variance reports (within 15 days after month-end)
+- **Annual Budget:** Due no later than November 1
+- **JV Agreements:** Empty folder in Dropbox — no JV OA on file
+
+### 340 Mt Kemble — PMA (Crown as PM)
+- **Monthly Reports:** Financial statements to FMC (15th biz day) — P&L, balance sheet, cash reconciliation, A/R aging, tenant status
+- **Quarterly Reports:** Comprehensive report to FMC — budget-to-actual variances, operational highlights, project updates, recommendations
+- **Annual Budget:** Due 60 days before fiscal year start
+- **PM Fee:** 3% of gross receipts, due by 5th of succeeding month
+- **Insurance Renewal:** Annual, submit certificates to lender
+
+### 340 Mt Kemble — SocGen Lender Reporting
+- **Quarterly:** Financial statements + rent roll to SocGen (within 45 days after quarter-end)
+- **Annual:** Operating budget + audited financials to SocGen (within 60/90 days after year-end)
+
+### 61 S Paramus — UBS/Midland Lender Reporting
+- **Monthly:** DSCR + operating statement to servicer (within 30 days after month-end)
+- **Annual:** Budget + audited financials to UBS (within 90 days)
+
+### Paramus Plaza — BankUnited Lender Reporting
+- **Monthly:** Operating statement + rent roll to BankUnited
+- **Quarterly:** Financial package to BankUnited
+- **Annual:** Budget + audited financials to BankUnited
+
 ## Database Schema Notes
 - `exec_transactions`: main bank transaction table. Key columns: `category_override` (TEXT), `category_name` (TEXT), `investment_id` (UUID FK → exec_investments). Index: `idx_exec_txn_investment` on `investment_id`
 - `exec_investments`: investment/asset tracking. Columns: id (UUID PK), name, ownership_pct, contributed, distributed, valuation, cap_rate, property_id (FK → properties), status, membership_class, committed, unreturned_capital, net_equity, close_date (DATE)
