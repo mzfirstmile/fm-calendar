@@ -431,6 +431,21 @@
   .cal-tooltip .tt-task { margin-bottom:4px; }
   .cal-tooltip .tt-owner { font-size:10px; color:var(--text-dim); }
 
+  /* ── Task List Table (below calendar) ── */
+  .cal-task-table { margin-top:16px; border:1px solid var(--border); border-radius:10px; overflow:hidden; }
+  .cal-task-table table { width:100%; border-collapse:collapse; font-size:12px; }
+  .cal-task-table thead { background:var(--surface2); }
+  .cal-task-table th { padding:9px 12px; text-align:left; font-size:10px; font-weight:600; color:var(--text-dim); text-transform:uppercase; letter-spacing:.4px; border-bottom:1px solid var(--border); }
+  .cal-task-table td { padding:8px 12px; border-bottom:1px solid var(--border); background:var(--surface); vertical-align:middle; }
+  .cal-task-table tr:last-child td { border-bottom:none; }
+  .cal-task-table tr:hover td { background:var(--surface2); }
+  .cal-task-table tr.cal-tbl-done td { opacity:.5; }
+  .cal-task-table .cal-tbl-status { width:28px; text-align:center; }
+  .cal-task-table .cal-tbl-cb { width:14px; height:14px; border-radius:3px; border:1.5px solid var(--border); display:inline-flex; align-items:center; justify-content:center; font-size:9px; cursor:pointer; transition:all .15s; }
+  .cal-task-table .cal-tbl-cb.on { background:var(--green); border-color:var(--green); color:#fff; }
+  .cal-task-table .cal-tbl-team { display:inline-block; padding:1px 6px; border-radius:8px; font-size:10px; font-weight:600; }
+  .cal-task-table .cal-tbl-day { font-weight:600; font-size:11px; min-width:20px; text-align:center; }
+
   /* ── CRUD Table ── */
   .crud-toolbar { display:flex; align-items:center; gap:12px; margin-bottom:16px; }
   .crud-count { font-size:12px; color:var(--text-dim); }
@@ -1013,6 +1028,7 @@
       <div class="cal-team-filters" id="calTeamFilters"></div>
       <div class="cal-filters" id="calFilters"></div>
       <div class="cal-grid" id="calGrid"></div>
+      <div id="calTaskTable" class="cal-task-table"></div>
       <div class="cal-tooltip" id="calTooltip"></div>
     </div>
 
@@ -2346,6 +2362,30 @@ $$;</pre></div>`;
     document.getElementById('calDoneCount').textContent = done;
     document.getElementById('calTotalCount').textContent = total;
     document.getElementById('calAllDone').className = 'cal-all-done' + (done === total && total > 0 ? ' show' : '');
+
+    // Task list table below calendar
+    const tbl = document.getElementById('calTaskTable');
+    const sortedTasks = allVisible.slice().sort((a, b) => a.day - b.day || a.property.localeCompare(b.property));
+    let tblHtml = `<table><thead><tr>
+      <th class="cal-tbl-status"></th>
+      <th>Day</th><th>Property</th><th>Task</th><th>Type</th><th>Team</th><th>Owner</th><th>Cadence</th>
+    </tr></thead><tbody>`;
+    sortedTasks.forEach(ev => {
+      const isDone = ev.status === 'Done';
+      const tc = TEAM_COLORS[ev.team] || '#888';
+      tblHtml += `<tr class="${isDone ? 'cal-tbl-done' : ''}">
+        <td class="cal-tbl-status"><div class="cal-tbl-cb${isDone ? ' on' : ''}" onclick="calToggle(${ev.idx})">${isDone ? '✓' : ''}</div></td>
+        <td class="cal-tbl-day">${ev.day}</td>
+        <td style="color:${calGetColor(ev.property)};font-weight:600;">${ev.property}</td>
+        <td>${ev.task}</td>
+        <td style="font-size:11px;">${ev.type}</td>
+        <td>${ev.team ? `<span class="cal-tbl-team" style="background:${tc}15;color:${tc}">${ev.team}</span>` : ''}</td>
+        <td style="font-size:11px;color:var(--text-dim);">${ev.owner}</td>
+        <td style="font-size:11px;color:var(--text-dim);">${ev.cadence}</td>
+      </tr>`;
+    });
+    tblHtml += '</tbody></table>';
+    tbl.innerHTML = tblHtml;
   }
 
   function calChangeMonth(delta) {
