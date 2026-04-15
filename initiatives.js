@@ -505,6 +505,248 @@
         border-radius: 10px;
         margin-left: 6px;
       }
+
+      /* ── Overview Dashboard ────────────────── */
+      #initRoot .init-overview { display: flex; flex-direction: column; gap: 24px; }
+
+      #initRoot .init-stats-row {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+        gap: 14px;
+      }
+      #initRoot .init-stat-card {
+        background: #fff;
+        border: 1px solid #e2e8f0;
+        border-radius: 12px;
+        padding: 18px 20px;
+        text-align: center;
+      }
+      #initRoot .init-stat-value {
+        font-size: 28px;
+        font-weight: 700;
+        color: #1e293b;
+        line-height: 1.1;
+      }
+      #initRoot .init-stat-label {
+        font-size: 12px;
+        color: #94a3b8;
+        margin-top: 4px;
+        text-transform: uppercase;
+        letter-spacing: .5px;
+        font-weight: 600;
+      }
+      #initRoot .init-stat-card.accent {
+        background: linear-gradient(135deg, #0ea5e9 0%, #0284c7 100%);
+        border-color: transparent;
+      }
+      #initRoot .init-stat-card.accent .init-stat-value,
+      #initRoot .init-stat-card.accent .init-stat-label { color: #fff; }
+
+      /* AI Summary */
+      #initRoot .init-ai-summary {
+        background: #fff;
+        border: 1px solid #e2e8f0;
+        border-radius: 14px;
+        padding: 24px 28px;
+        position: relative;
+      }
+      #initRoot .init-ai-summary::before {
+        content: 'AI Summary';
+        position: absolute;
+        top: -10px;
+        left: 20px;
+        background: linear-gradient(135deg, #8b5cf6, #6d28d9);
+        color: #fff;
+        font-size: 10px;
+        font-weight: 700;
+        padding: 3px 12px;
+        border-radius: 6px;
+        text-transform: uppercase;
+        letter-spacing: .8px;
+      }
+      #initRoot .init-ai-narrative {
+        font-size: 14px;
+        line-height: 1.7;
+        color: #334155;
+        margin-top: 4px;
+      }
+      #initRoot .init-ai-narrative strong { color: #1e293b; }
+
+      /* Milestone Progress */
+      #initRoot .init-progress-section {
+        background: #fff;
+        border: 1px solid #e2e8f0;
+        border-radius: 14px;
+        padding: 22px 28px;
+      }
+      #initRoot .init-progress-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 14px;
+      }
+      #initRoot .init-progress-header h4 {
+        font-size: 15px;
+        font-weight: 700;
+        color: #1e293b;
+        margin: 0;
+      }
+      #initRoot .init-progress-pct {
+        font-size: 14px;
+        font-weight: 700;
+        color: #0ea5e9;
+      }
+      #initRoot .init-progress-bar {
+        width: 100%;
+        height: 10px;
+        background: #f1f5f9;
+        border-radius: 5px;
+        overflow: hidden;
+        margin-bottom: 16px;
+      }
+      #initRoot .init-progress-fill {
+        height: 100%;
+        background: linear-gradient(90deg, #10b981, #0ea5e9);
+        border-radius: 5px;
+        transition: width .6s ease;
+      }
+      #initRoot .init-progress-items {
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+      }
+      #initRoot .init-progress-item {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        font-size: 13px;
+        color: #475569;
+      }
+      #initRoot .init-progress-dot {
+        width: 8px;
+        height: 8px;
+        border-radius: 50%;
+        flex-shrink: 0;
+      }
+      #initRoot .init-progress-dot.done { background: #10b981; }
+      #initRoot .init-progress-dot.pending { background: #e2e8f0; }
+      #initRoot .init-progress-dot.overdue { background: #ef4444; }
+      #initRoot .init-progress-item .due {
+        margin-left: auto;
+        font-size: 11px;
+        color: #94a3b8;
+      }
+      #initRoot .init-progress-item .due.overdue { color: #ef4444; font-weight: 600; }
+
+      /* Visual Timeline */
+      #initRoot .init-visual-timeline {
+        background: #fff;
+        border: 1px solid #e2e8f0;
+        border-radius: 14px;
+        padding: 22px 28px;
+      }
+      #initRoot .init-visual-timeline h4 {
+        font-size: 15px;
+        font-weight: 700;
+        color: #1e293b;
+        margin: 0 0 16px 0;
+      }
+      #initRoot .init-vt-track {
+        position: relative;
+        height: 60px;
+        background: #f8fafc;
+        border-radius: 8px;
+        overflow: hidden;
+        margin-bottom: 12px;
+      }
+      #initRoot .init-vt-bar {
+        position: absolute;
+        top: 8px;
+        height: 12px;
+        border-radius: 6px;
+        opacity: .85;
+      }
+      #initRoot .init-vt-bar.emails { background: #3b82f6; top: 8px; }
+      #initRoot .init-vt-bar.notes { background: #8b5cf6; top: 26px; }
+      #initRoot .init-vt-bar.milestones { background: #f59e0b; top: 44px; }
+      #initRoot .init-vt-marker {
+        position: absolute;
+        top: 0;
+        bottom: 0;
+        width: 2px;
+        background: #ef4444;
+        z-index: 2;
+      }
+      #initRoot .init-vt-marker::after {
+        content: 'Today';
+        position: absolute;
+        top: -18px;
+        left: -14px;
+        font-size: 9px;
+        font-weight: 700;
+        color: #ef4444;
+        text-transform: uppercase;
+      }
+      #initRoot .init-vt-legend {
+        display: flex;
+        gap: 20px;
+        font-size: 11px;
+        color: #94a3b8;
+      }
+      #initRoot .init-vt-legend span {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+      }
+      #initRoot .init-vt-legend-dot {
+        width: 8px;
+        height: 8px;
+        border-radius: 2px;
+        display: inline-block;
+      }
+      #initRoot .init-vt-dates {
+        display: flex;
+        justify-content: space-between;
+        font-size: 10px;
+        color: #94a3b8;
+        margin-bottom: 4px;
+      }
+
+      /* Key Decisions / Open Items boxes */
+      #initRoot .init-two-col {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 16px;
+      }
+      @media (max-width: 900px) { #initRoot .init-two-col { grid-template-columns: 1fr; } }
+      #initRoot .init-info-box {
+        background: #fff;
+        border: 1px solid #e2e8f0;
+        border-radius: 14px;
+        padding: 20px 24px;
+      }
+      #initRoot .init-info-box h4 {
+        font-size: 14px;
+        font-weight: 700;
+        color: #1e293b;
+        margin: 0 0 12px 0;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+      }
+      #initRoot .init-info-box ul {
+        list-style: none;
+        padding: 0;
+        margin: 0;
+      }
+      #initRoot .init-info-box li {
+        font-size: 13px;
+        color: #475569;
+        padding: 6px 0;
+        border-bottom: 1px solid #f1f5f9;
+        line-height: 1.5;
+      }
+      #initRoot .init-info-box li:last-child { border-bottom: none; }
     `;
     document.head.appendChild(style);
   }
@@ -552,12 +794,16 @@
         </div>
 
         <div class="init-tabs" id="initTabs">
-          <button class="init-tab active" data-tab="activity">Activity</button>
+          <button class="init-tab active" data-tab="overview">Overview</button>
+          <button class="init-tab" data-tab="activity">Activity</button>
           <button class="init-tab" data-tab="milestones">Milestones</button>
           <button class="init-tab" data-tab="team">Team</button>
         </div>
 
-        <div class="init-tab-panel show" id="initPanelActivity">
+        <div class="init-tab-panel show" id="initPanelOverview">
+          <div class="init-overview" id="initOverview"></div>
+        </div>
+        <div class="init-tab-panel" id="initPanelActivity">
           <div class="init-timeline" id="initTimeline"></div>
         </div>
         <div class="init-tab-panel" id="initPanelMilestones">
@@ -698,12 +944,13 @@
     document.getElementById('initDetailTitle').textContent = _currentInitiative.name;
     document.getElementById('initDetailSummary').textContent = _currentInitiative.summary || '';
 
-    // Reset to activity tab
+    // Reset to overview tab (default landing)
     document.querySelectorAll('#initRoot .init-tab').forEach(t => t.classList.remove('active'));
     document.querySelectorAll('#initRoot .init-tab-panel').forEach(p => p.classList.remove('show'));
-    document.querySelector('#initRoot .init-tab[data-tab="activity"]').classList.add('active');
-    document.getElementById('initPanelActivity').classList.add('show');
+    document.querySelector('#initRoot .init-tab[data-tab="overview"]').classList.add('active');
+    document.getElementById('initPanelOverview').classList.add('show');
 
+    _renderOverview();
     _renderTimeline();
     _renderMilestones();
     _renderTeam();
@@ -844,6 +1091,262 @@
         </div>
       `;
     }).join('');
+  }
+
+  // ── Overview Dashboard rendering ──────────────────────────
+  function _renderOverview() {
+    const el = document.getElementById('initOverview');
+    if (!el || !_currentInitiative) return;
+    const ci = _currentInitiative;
+    const initId = ci.id;
+
+    // Gather stats
+    const projectEntries = _entries.filter(e => e.initiative_id === initId);
+    const emails = projectEntries.filter(e => e.entry_type === 'email');
+    const notes = projectEntries.filter(e => e.entry_type === 'note');
+    const docs = projectEntries.filter(e => e.entry_type === 'document');
+    const milestones = projectEntries.filter(e => e.entry_type === 'milestone');
+    const tasks = projectEntries.filter(e => e.entry_type === 'task');
+    const team = _members.filter(m => m.initiative_id === initId);
+    const completedMs = milestones.filter(m => m.metadata?.completed);
+    const msPct = milestones.length > 0 ? Math.round((completedMs.length / milestones.length) * 100) : 0;
+
+    // Date range
+    const allDates = projectEntries.map(e => new Date(e.created_at)).sort((a, b) => a - b);
+    const startDate = allDates[0] || new Date();
+    const endDate = allDates[allDates.length - 1] || new Date();
+    const daysActive = Math.max(1, Math.ceil((endDate - startDate) / 86400000));
+    const startStr = startDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+    const endStr = endDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+
+    // Owner
+    const owner = team.find(m => m.role === 'owner');
+    const ownerName = owner ? _emailToName(owner.email) : 'Unassigned';
+
+    // Generate AI narrative from available data
+    const narrative = _generateNarrative(ci, { emails, notes, docs, milestones, completedMs, tasks, team, daysActive, startDate, endDate });
+
+    // Key decisions from pinned notes
+    const pinnedNotes = projectEntries.filter(e => e.is_pinned);
+
+    // Open items (incomplete milestones + tasks)
+    const openMs = milestones.filter(m => !m.metadata?.completed);
+    const openTasks = tasks.filter(t => !t.metadata?.completed);
+
+    // Build visual timeline data
+    const vtHTML = _buildVisualTimeline(projectEntries, startDate, endDate);
+
+    el.innerHTML = `
+      <!-- Stats Row -->
+      <div class="init-stats-row">
+        <div class="init-stat-card accent">
+          <div class="init-stat-value">${projectEntries.length}</div>
+          <div class="init-stat-label">Total Entries</div>
+        </div>
+        <div class="init-stat-card">
+          <div class="init-stat-value">${emails.length}</div>
+          <div class="init-stat-label">Emails</div>
+        </div>
+        <div class="init-stat-card">
+          <div class="init-stat-value">${docs.length}</div>
+          <div class="init-stat-label">Documents</div>
+        </div>
+        <div class="init-stat-card">
+          <div class="init-stat-value">${team.length}</div>
+          <div class="init-stat-label">Team</div>
+        </div>
+        <div class="init-stat-card">
+          <div class="init-stat-value">${daysActive}d</div>
+          <div class="init-stat-label">Active</div>
+        </div>
+      </div>
+
+      <!-- AI Summary -->
+      <div class="init-ai-summary">
+        <div class="init-ai-narrative">${narrative}</div>
+      </div>
+
+      <!-- Milestone Progress -->
+      <div class="init-progress-section">
+        <div class="init-progress-header">
+          <h4>Milestone Progress</h4>
+          <span class="init-progress-pct">${completedMs.length}/${milestones.length} complete (${msPct}%)</span>
+        </div>
+        <div class="init-progress-bar">
+          <div class="init-progress-fill" style="width:${msPct}%"></div>
+        </div>
+        <div class="init-progress-items">
+          ${milestones.map(m => {
+            const done = m.metadata?.completed;
+            const dueDate = m.metadata?.due_date;
+            const isOverdue = !done && dueDate && new Date(dueDate + 'T23:59:59') < new Date();
+            const dueFmt = dueDate ? new Date(dueDate + 'T12:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) : '';
+            const dotClass = done ? 'done' : isOverdue ? 'overdue' : 'pending';
+            const dueClass = isOverdue ? 'overdue' : '';
+            return `<div class="init-progress-item">
+              <span class="init-progress-dot ${dotClass}"></span>
+              <span style="${done ? 'text-decoration:line-through;color:#94a3b8;' : ''}">${_esc(m.title)}</span>
+              <span class="due ${dueClass}">${done ? 'Done' : dueFmt ? (isOverdue ? 'Overdue — ' : 'Due ') + dueFmt : ''}</span>
+            </div>`;
+          }).join('')}
+        </div>
+      </div>
+
+      <!-- Visual Timeline -->
+      ${vtHTML}
+
+      <!-- Key Info + Open Items -->
+      <div class="init-two-col">
+        <div class="init-info-box">
+          <h4><span style="font-size:16px;">📌</span> Key Context</h4>
+          <ul>
+            ${pinnedNotes.length > 0 ? pinnedNotes.map(n => `<li>${_esc(n.content || n.title || 'Note')}</li>`).join('') : `<li style="color:#94a3b8;">No pinned notes yet</li>`}
+          </ul>
+        </div>
+        <div class="init-info-box">
+          <h4><span style="font-size:16px;">⚡</span> Open Items</h4>
+          <ul>
+            ${[...openMs.map(m => `<li><strong>Milestone:</strong> ${_esc(m.title)}${m.metadata?.due_date ? ' — due ' + m.metadata.due_date : ''}</li>`),
+              ...openTasks.map(t => `<li><strong>Task:</strong> ${_esc(t.title)}${t.metadata?.assignee ? ' (' + t.metadata.assignee + ')' : ''}</li>`)
+            ].join('') || '<li style="color:#94a3b8;">All clear!</li>'}
+          </ul>
+        </div>
+      </div>
+
+      <!-- Project Meta -->
+      <div style="display:flex;gap:20px;font-size:12px;color:#94a3b8;padding:8px 4px;">
+        <span>Lead: <strong style="color:#475569;">${_esc(ownerName)}</strong></span>
+        <span>Started: <strong style="color:#475569;">${startStr}</strong></span>
+        <span>Latest: <strong style="color:#475569;">${endStr}</strong></span>
+        <span>Status: <strong style="color:#475569;text-transform:capitalize;">${ci.status.replace('_', ' ')}</strong></span>
+      </div>
+    `;
+  }
+
+  // ── AI Narrative Generator ──────────────────────────────
+  function _generateNarrative(init, data) {
+    const { emails, notes, docs, milestones, completedMs, tasks, team, daysActive, startDate, endDate } = data;
+    const ownerMember = team.find(m => m.role === 'owner');
+    const ownerName = ownerMember ? _emailToName(ownerMember.email).split(' ')[0] : 'The team';
+    const totalEntries = emails.length + notes.length + docs.length + milestones.length + tasks.length;
+    const msPct = milestones.length > 0 ? Math.round((completedMs.length / milestones.length) * 100) : 0;
+
+    // Build contextual sentences
+    let parts = [];
+
+    // Opening — status + age
+    if (init.status === 'active') {
+      parts.push(`<strong>${_esc(init.name)}</strong> is an active initiative that has been running for <strong>${daysActive} days</strong>.`);
+    } else if (init.status === 'completed') {
+      parts.push(`<strong>${_esc(init.name)}</strong> has been completed after ${daysActive} days of activity.`);
+    } else {
+      parts.push(`<strong>${_esc(init.name)}</strong> is currently <strong>${init.status.replace('_', ' ')}</strong>, with ${daysActive} days of tracked activity.`);
+    }
+
+    // Summary context
+    if (init.summary) {
+      parts.push(init.summary);
+    }
+
+    // Activity volume
+    if (emails.length > 0) {
+      const sent = emails.filter(e => e.metadata?.direction === 'sent').length;
+      const received = emails.length - sent;
+      parts.push(`The communication log includes <strong>${emails.length} emails</strong> (${sent} sent, ${received} received)${docs.length > 0 ? ` and <strong>${docs.length} document${docs.length > 1 ? 's' : ''}</strong>` : ''}.`);
+    }
+
+    // Milestone progress
+    if (milestones.length > 0) {
+      if (msPct === 100) {
+        parts.push(`All <strong>${milestones.length} milestones</strong> have been completed.`);
+      } else if (msPct > 0) {
+        const openMs = milestones.filter(m => !m.metadata?.completed);
+        const nextMs = openMs.sort((a, b) => (a.metadata?.due_date || '9999').localeCompare(b.metadata?.due_date || '9999'))[0];
+        parts.push(`<strong>${completedMs.length} of ${milestones.length}</strong> milestones are complete (${msPct}%). Next up: <strong>${_esc(nextMs?.title || 'TBD')}</strong>${nextMs?.metadata?.due_date ? ' (due ' + nextMs.metadata.due_date + ')' : ''}.`);
+
+        // Overdue warning
+        const overdue = openMs.filter(m => m.metadata?.due_date && new Date(m.metadata.due_date + 'T23:59:59') < new Date());
+        if (overdue.length > 0) {
+          parts.push(`<span style="color:#ef4444;font-weight:600;">⚠ ${overdue.length} milestone${overdue.length > 1 ? 's are' : ' is'} past due.</span>`);
+        }
+      }
+    }
+
+    // Team
+    parts.push(`${ownerName} is leading this initiative with a team of <strong>${team.length}</strong>.`);
+
+    return parts.join(' ');
+  }
+
+  // ── Visual Timeline Chart ───────────────────────────────
+  function _buildVisualTimeline(entries, startDate, endDate) {
+    // Extend end date slightly for padding
+    const padEnd = new Date(Math.max(endDate.getTime(), Date.now()) + 86400000 * 3);
+    const padStart = new Date(startDate.getTime() - 86400000);
+    const totalMs = padEnd - padStart;
+    const pct = (d) => Math.min(100, Math.max(0, ((d - padStart) / totalMs) * 100));
+
+    // Group entries by type and date
+    const emails = entries.filter(e => e.entry_type === 'email');
+    const nonEmails = entries.filter(e => e.entry_type === 'note' || e.entry_type === 'document');
+    const milestones = entries.filter(e => e.entry_type === 'milestone');
+
+    // Build date clusters for bars
+    const buildBars = (items, color, row) => {
+      if (items.length === 0) return '';
+      // Cluster items within 12hrs of each other
+      const sorted = [...items].sort((a, b) => new Date(a.created_at) - new Date(b.created_at));
+      let bars = '';
+      let clusterStart = new Date(sorted[0].created_at);
+      let clusterEnd = clusterStart;
+      for (let i = 1; i <= sorted.length; i++) {
+        const cur = i < sorted.length ? new Date(sorted[i].created_at) : null;
+        if (cur && (cur - clusterEnd) < 43200000) { // 12hrs
+          clusterEnd = cur;
+        } else {
+          const left = pct(clusterStart);
+          const width = Math.max(2, pct(new Date(clusterEnd.getTime() + 3600000)) - left);
+          bars += `<div class="init-vt-bar" style="left:${left}%;width:${width}%;background:${color};top:${row}px;"></div>`;
+          if (cur) { clusterStart = cur; clusterEnd = cur; }
+        }
+      }
+      return bars;
+    };
+
+    // Today marker
+    const todayPct = pct(new Date());
+    const todayMarker = todayPct > 0 && todayPct < 100 ? `<div class="init-vt-marker" style="left:${todayPct}%"></div>` : '';
+
+    // Milestone markers (diamonds)
+    const msMarkers = milestones.map(m => {
+      const d = m.metadata?.due_date ? new Date(m.metadata.due_date + 'T12:00:00') : new Date(m.created_at);
+      const left = pct(d);
+      const done = m.metadata?.completed;
+      const color = done ? '#10b981' : '#f59e0b';
+      return `<div style="position:absolute;left:${left}%;top:40px;transform:translateX(-50%) rotate(45deg);width:10px;height:10px;background:${color};border:2px solid #fff;box-shadow:0 0 0 1px ${color};z-index:1;"></div>`;
+    }).join('');
+
+    const startFmt = padStart.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+    const endFmt = padEnd.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+
+    return `
+      <div class="init-visual-timeline">
+        <h4>Activity Timeline</h4>
+        <div class="init-vt-dates"><span>${startFmt}</span><span>${endFmt}</span></div>
+        <div class="init-vt-track">
+          ${buildBars(emails, '#3b82f6', 8)}
+          ${buildBars(nonEmails, '#8b5cf6', 26)}
+          ${msMarkers}
+          ${todayMarker}
+        </div>
+        <div class="init-vt-legend">
+          <span><span class="init-vt-legend-dot" style="background:#3b82f6;"></span> Emails</span>
+          <span><span class="init-vt-legend-dot" style="background:#8b5cf6;"></span> Notes & Docs</span>
+          <span><span class="init-vt-legend-dot" style="background:#f59e0b;border-radius:0;transform:rotate(45deg);"></span> Milestones</span>
+          <span><span style="display:inline-block;width:8px;height:8px;border-left:2px solid #ef4444;"></span> Today</span>
+        </div>
+      </div>
+    `;
   }
 
   // ── Modal helpers ────────────────────────────────────────
