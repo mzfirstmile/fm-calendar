@@ -747,6 +747,112 @@
         line-height: 1.5;
       }
       #initRoot .init-info-box li:last-child { border-bottom: none; }
+
+      /* ── Deal Table (key metrics visual) ─── */
+      #initRoot .init-deal-section {
+        background: #fff;
+        border: 1px solid #e2e8f0;
+        border-radius: 14px;
+        padding: 22px 28px;
+        position: relative;
+      }
+      #initRoot .init-deal-section::before {
+        content: 'Key Analysis';
+        position: absolute;
+        top: -10px;
+        left: 20px;
+        background: linear-gradient(135deg, #0ea5e9, #0284c7);
+        color: #fff;
+        font-size: 10px;
+        font-weight: 700;
+        padding: 3px 12px;
+        border-radius: 6px;
+        text-transform: uppercase;
+        letter-spacing: .8px;
+      }
+      #initRoot .init-deal-title {
+        font-size: 16px;
+        font-weight: 700;
+        color: #1e293b;
+        margin: 4px 0 14px 0;
+      }
+      #initRoot .init-deal-table {
+        width: 100%;
+        border-collapse: collapse;
+        font-size: 13px;
+      }
+      #initRoot .init-deal-table th {
+        text-align: left;
+        font-size: 11px;
+        font-weight: 700;
+        color: #64748b;
+        text-transform: uppercase;
+        letter-spacing: .5px;
+        padding: 8px 12px;
+        border-bottom: 2px solid #e2e8f0;
+        background: #f8fafc;
+      }
+      #initRoot .init-deal-table td {
+        padding: 10px 12px;
+        border-bottom: 1px solid #f1f5f9;
+        color: #334155;
+      }
+      #initRoot .init-deal-table tr.highlight td {
+        background: #f0f9ff;
+        font-weight: 600;
+        color: #0c4a6e;
+      }
+      #initRoot .init-deal-table tr:last-child td { border-bottom: none; }
+
+      #initRoot .init-deal-stats {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 10px;
+        margin-top: 16px;
+        padding-top: 14px;
+        border-top: 1px solid #e2e8f0;
+      }
+      #initRoot .init-deal-stat {
+        flex: 1 1 140px;
+        background: #f8fafc;
+        border-radius: 8px;
+        padding: 10px 14px;
+        text-align: center;
+      }
+      #initRoot .init-deal-stat-val {
+        font-size: 16px;
+        font-weight: 700;
+        color: #0ea5e9;
+      }
+      #initRoot .init-deal-stat-lbl {
+        font-size: 10px;
+        color: #94a3b8;
+        text-transform: uppercase;
+        letter-spacing: .4px;
+        margin-top: 2px;
+      }
+
+      /* ── Compact Stats Bar ─────────────────── */
+      #initRoot .init-stats-bar {
+        display: flex;
+        gap: 6px;
+        flex-wrap: wrap;
+      }
+      #initRoot .init-stat-chip {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        background: #f8fafc;
+        border: 1px solid #e2e8f0;
+        border-radius: 8px;
+        padding: 8px 14px;
+        font-size: 13px;
+        color: #475569;
+      }
+      #initRoot .init-stat-chip strong {
+        color: #1e293b;
+        font-weight: 700;
+      }
     `;
     document.head.appendChild(style);
   }
@@ -1103,7 +1209,7 @@
     // Gather stats
     const projectEntries = _entries.filter(e => e.initiative_id === initId);
     const emails = projectEntries.filter(e => e.entry_type === 'email');
-    const notes = projectEntries.filter(e => e.entry_type === 'note');
+    const notes = projectEntries.filter(e => e.entry_type === 'note' && e.content !== 'key_metrics');
     const docs = projectEntries.filter(e => e.entry_type === 'document');
     const milestones = projectEntries.filter(e => e.entry_type === 'milestone');
     const tasks = projectEntries.filter(e => e.entry_type === 'task');
@@ -1116,109 +1222,121 @@
     const startDate = allDates[0] || new Date();
     const endDate = allDates[allDates.length - 1] || new Date();
     const daysActive = Math.max(1, Math.ceil((endDate - startDate) / 86400000));
-    const startStr = startDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
-    const endStr = endDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
 
     // Owner
     const owner = team.find(m => m.role === 'owner');
     const ownerName = owner ? _emailToName(owner.email) : 'Unassigned';
 
-    // Generate AI narrative from available data
+    // Generate AI narrative
     const narrative = _generateNarrative(ci, { emails, notes, docs, milestones, completedMs, tasks, team, daysActive, startDate, endDate });
 
-    // Key decisions from pinned notes
-    const pinnedNotes = projectEntries.filter(e => e.is_pinned);
+    // Find key_metrics entry (deal table)
+    const metricsEntry = projectEntries.find(e => e.content === 'key_metrics' && e.metadata?.type === 'deal_table');
+    const dealHTML = metricsEntry ? _buildDealTable(metricsEntry.metadata) : '';
 
-    // Open items (incomplete milestones + tasks)
+    // Pinned notes (excluding key_metrics)
+    const pinnedNotes = projectEntries.filter(e => e.is_pinned && e.content !== 'key_metrics');
+
+    // Open items
     const openMs = milestones.filter(m => !m.metadata?.completed);
     const openTasks = tasks.filter(t => !t.metadata?.completed);
 
-    // Build visual timeline data
-    const vtHTML = _buildVisualTimeline(projectEntries, startDate, endDate);
+    // Visual timeline
+    const vtHTML = _buildVisualTimeline(projectEntries.filter(e => e.content !== 'key_metrics'), startDate, endDate);
 
     el.innerHTML = `
-      <!-- Stats Row -->
-      <div class="init-stats-row">
-        <div class="init-stat-card accent">
-          <div class="init-stat-value">${projectEntries.length}</div>
-          <div class="init-stat-label">Total Entries</div>
-        </div>
-        <div class="init-stat-card">
-          <div class="init-stat-value">${emails.length}</div>
-          <div class="init-stat-label">Emails</div>
-        </div>
-        <div class="init-stat-card">
-          <div class="init-stat-value">${docs.length}</div>
-          <div class="init-stat-label">Documents</div>
-        </div>
-        <div class="init-stat-card">
-          <div class="init-stat-value">${team.length}</div>
-          <div class="init-stat-label">Team</div>
-        </div>
-        <div class="init-stat-card">
-          <div class="init-stat-value">${daysActive}d</div>
-          <div class="init-stat-label">Active</div>
-        </div>
-      </div>
-
-      <!-- AI Summary -->
+      <!-- 1. AI Summary — FIRST -->
       <div class="init-ai-summary">
         <div class="init-ai-narrative">${narrative}</div>
       </div>
 
-      <!-- Milestone Progress -->
-      <div class="init-progress-section">
-        <div class="init-progress-header">
-          <h4>Milestone Progress</h4>
-          <span class="init-progress-pct">${completedMs.length}/${milestones.length} complete (${msPct}%)</span>
-        </div>
-        <div class="init-progress-bar">
-          <div class="init-progress-fill" style="width:${msPct}%"></div>
-        </div>
-        <div class="init-progress-items">
-          ${milestones.map(m => {
-            const done = m.metadata?.completed;
-            const dueDate = m.metadata?.due_date;
-            const isOverdue = !done && dueDate && new Date(dueDate + 'T23:59:59') < new Date();
-            const dueFmt = dueDate ? new Date(dueDate + 'T12:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) : '';
-            const dotClass = done ? 'done' : isOverdue ? 'overdue' : 'pending';
-            const dueClass = isOverdue ? 'overdue' : '';
-            return `<div class="init-progress-item">
-              <span class="init-progress-dot ${dotClass}"></span>
-              <span style="${done ? 'text-decoration:line-through;color:#94a3b8;' : ''}">${_esc(m.title)}</span>
-              <span class="due ${dueClass}">${done ? 'Done' : dueFmt ? (isOverdue ? 'Overdue — ' : 'Due ') + dueFmt : ''}</span>
-            </div>`;
-          }).join('')}
+      <!-- 2. Key Deal Visual / Table — project-specific -->
+      ${dealHTML}
+
+      <!-- 3. Compact Stats Bar -->
+      <div class="init-stats-bar">
+        <div class="init-stat-chip"><strong>${emails.length}</strong> emails</div>
+        <div class="init-stat-chip"><strong>${docs.length}</strong> docs</div>
+        <div class="init-stat-chip"><strong>${team.length}</strong> team</div>
+        <div class="init-stat-chip"><strong>${daysActive}d</strong> active</div>
+        <div class="init-stat-chip">Lead: <strong>${_esc(ownerName.split(' ')[0])}</strong></div>
+        <div class="init-stat-chip" style="${msPct === 100 ? 'background:#dcfce7;border-color:#86efac;' : msPct > 0 ? 'background:#dbeafe;border-color:#93c5fd;' : ''}">
+          <strong>${completedMs.length}/${milestones.length}</strong> milestones
         </div>
       </div>
 
-      <!-- Visual Timeline -->
-      ${vtHTML}
-
-      <!-- Key Info + Open Items -->
+      <!-- 4. Milestone Progress + Open Items side by side -->
       <div class="init-two-col">
+        <div class="init-progress-section">
+          <div class="init-progress-header">
+            <h4>Milestones</h4>
+            <span class="init-progress-pct">${msPct}%</span>
+          </div>
+          <div class="init-progress-bar">
+            <div class="init-progress-fill" style="width:${msPct}%"></div>
+          </div>
+          <div class="init-progress-items">
+            ${milestones.map(m => {
+              const done = m.metadata?.completed;
+              const dueDate = m.metadata?.due_date;
+              const isOverdue = !done && dueDate && new Date(dueDate + 'T23:59:59') < new Date();
+              const dueFmt = dueDate ? new Date(dueDate + 'T12:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) : '';
+              const dotClass = done ? 'done' : isOverdue ? 'overdue' : 'pending';
+              const dueClass = isOverdue ? 'overdue' : '';
+              return `<div class="init-progress-item">
+                <span class="init-progress-dot ${dotClass}"></span>
+                <span style="${done ? 'text-decoration:line-through;color:#94a3b8;' : ''}">${_esc(m.title)}</span>
+                <span class="due ${dueClass}">${done ? 'Done' : dueFmt ? (isOverdue ? 'Overdue' : dueFmt) : ''}</span>
+              </div>`;
+            }).join('')}
+          </div>
+        </div>
         <div class="init-info-box">
-          <h4><span style="font-size:16px;">📌</span> Key Context</h4>
+          <h4>Key Context</h4>
           <ul>
             ${pinnedNotes.length > 0 ? pinnedNotes.map(n => `<li>${_esc(n.content || n.title || 'Note')}</li>`).join('') : `<li style="color:#94a3b8;">No pinned notes yet</li>`}
-          </ul>
-        </div>
-        <div class="init-info-box">
-          <h4><span style="font-size:16px;">⚡</span> Open Items</h4>
-          <ul>
-            ${[...openMs.map(m => `<li><strong>Milestone:</strong> ${_esc(m.title)}${m.metadata?.due_date ? ' — due ' + m.metadata.due_date : ''}</li>`),
-              ...openTasks.map(t => `<li><strong>Task:</strong> ${_esc(t.title)}${t.metadata?.assignee ? ' (' + t.metadata.assignee + ')' : ''}</li>`)
-            ].join('') || '<li style="color:#94a3b8;">All clear!</li>'}
+            ${openMs.length > 0 || openTasks.length > 0 ? '<li style="border-top:1px solid #e2e8f0;padding-top:10px;margin-top:4px;font-weight:600;color:#1e293b;">Open Items</li>' : ''}
+            ${openMs.map(m => `<li>→ ${_esc(m.title)}${m.metadata?.due_date ? ' <span style="color:#94a3b8;font-size:11px;">(due ' + m.metadata.due_date + ')</span>' : ''}</li>`).join('')}
+            ${openTasks.map(t => `<li>→ ${_esc(t.title)}</li>`).join('')}
           </ul>
         </div>
       </div>
 
-      <!-- Project Meta -->
-      <div style="display:flex;gap:20px;font-size:12px;color:#94a3b8;padding:8px 4px;">
-        <span>Lead: <strong style="color:#475569;">${_esc(ownerName)}</strong></span>
-        <span>Started: <strong style="color:#475569;">${startStr}</strong></span>
-        <span>Latest: <strong style="color:#475569;">${endStr}</strong></span>
-        <span>Status: <strong style="color:#475569;text-transform:capitalize;">${ci.status.replace('_', ' ')}</strong></span>
+      <!-- 5. Activity Timeline -->
+      ${vtHTML}
+    `;
+  }
+
+  // ── Deal Table Builder ──────────────────────────────────
+  function _buildDealTable(meta) {
+    if (!meta || !meta.columns || !meta.rows) return '';
+    const highlightIdx = meta.highlight_row ?? -1;
+
+    let tableRows = meta.rows.map((row, i) => {
+      const cls = i === highlightIdx ? ' class="highlight"' : '';
+      return `<tr${cls}>${row.map(cell => `<td>${_esc(cell)}</td>`).join('')}</tr>`;
+    }).join('');
+
+    let statsHTML = '';
+    if (meta.summary_stats && meta.summary_stats.length > 0) {
+      statsHTML = `<div class="init-deal-stats">
+        ${meta.summary_stats.map(s => `
+          <div class="init-deal-stat">
+            <div class="init-deal-stat-val">${_esc(s.value)}</div>
+            <div class="init-deal-stat-lbl">${_esc(s.label)}</div>
+          </div>
+        `).join('')}
+      </div>`;
+    }
+
+    return `
+      <div class="init-deal-section">
+        <div class="init-deal-title">${_esc(meta.table_title || 'Analysis')}</div>
+        <table class="init-deal-table">
+          <thead><tr>${meta.columns.map(c => `<th>${_esc(c)}</th>`).join('')}</tr></thead>
+          <tbody>${tableRows}</tbody>
+        </table>
+        ${statsHTML}
       </div>
     `;
   }
