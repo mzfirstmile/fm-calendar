@@ -109,6 +109,9 @@ The embedded Claude chat has access to these tools:
 - **Team roles:** owner, member, viewer — stored in `initiative_members.role`
 - **Seeded test project:** "41 Flatbush — Gimlet/Spotify Lease Buyout" with 26 emails from the RC/AI thread, 3 milestones, 1 pinned note. Members: rc@ (owner), mz@ (member), aiassistant@ (member)
 - **Design intent (from Morris):** When someone emails AI assistant a project question, Claude should use judgment: create a new initiative if it's a real project, add to an existing one if it's a continuation, or just reply if it's a simple question. Only email recipients (to/cc) should be added as members.
+- **CRITICAL: Always reply to emails.** When Morris (or anyone) emails the AI assistant with a task like "create a new initiative", Claude MUST send a confirmation reply email acknowledging receipt, summarizing what was created, and linking to the dashboard. Never leave an email unanswered.
+- **Overview tab:** Default landing when opening a project. Layout order: (1) AI Summary narrative, (2) Key deal visual/table specific to the project goal (stored as entry with `content='key_metrics'` and `metadata.type='deal_table'`), (3) compact stat chips, (4) milestones + key context side-by-side, (5) activity timeline. The deal table should reflect the core decision the project is driving toward — e.g. buyout offer scenarios for Gimlet, ask-vs-target comparison for acquisitions.
+- **Access:** Module is visible to all users (no `access_initiatives` column). Data-level visibility controlled by `initiative_members` — non-admins only see initiatives they're members of.
 - **`window.currentUser` exposure:** Added `Object.defineProperty` getter on `window` to expose the closure-scoped `currentUser` variable to external modules. Uses `isAdmin` (camelCase, not `is_admin`).
 - **Migration file:** `migration/create-initiatives.sql`
 
