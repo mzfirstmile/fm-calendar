@@ -916,6 +916,27 @@
         display: flex;
         gap: 10px;
       }
+      #initRoot .init-doc-dl {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        width: 36px;
+        height: 36px;
+        border-radius: 8px;
+        background: #f1f5f9;
+        color: #475569;
+        flex-shrink: 0;
+        align-self: center;
+        transition: all .15s;
+        text-decoration: none;
+      }
+      #initRoot .init-doc-dl:hover {
+        background: #0ea5e9;
+        color: #fff;
+      }
+      #initRoot .init-doc-card[onclick] .init-doc-name {
+        color: #0ea5e9;
+      }
     `;
     document.head.appendChild(style);
   }
@@ -1300,9 +1321,15 @@
       const date = new Date(doc.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
       const source = meta.source || '';
       const desc = doc.content && doc.content !== 'key_metrics' ? doc.content : doc.title || '';
+      const url = meta.url || '';
+      const hasLink = !!url;
+      const clickAttr = hasLink ? `onclick="window.open('${_esc(url)}','_blank')" style="cursor:pointer;"` : '';
+      const dlBtn = hasLink ? `<a href="${_esc(url)}" download class="init-doc-dl" title="Download" onclick="event.stopPropagation();">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+      </a>` : '';
 
       return `
-        <div class="init-doc-card">
+        <div class="init-doc-card" ${clickAttr}>
           <div class="init-doc-icon ${iconClass}">${icon}</div>
           <div class="init-doc-info">
             <div class="init-doc-name" title="${_esc(filename)}">${_esc(filename)}</div>
@@ -1310,8 +1337,10 @@
             <div class="init-doc-meta">
               <span>${date}</span>
               ${source ? `<span>${_esc(source)}</span>` : ''}
+              ${!hasLink ? '<span style="color:#f59e0b;font-weight:600;">No file linked</span>' : ''}
             </div>
           </div>
+          ${dlBtn}
         </div>
       `;
     }).join('');
@@ -1350,12 +1379,15 @@
     _showModal('Add Document', `
       <label>Document Name / Filename</label>
       <input id="initDocName" placeholder="e.g. Buyout_Analysis_v2.xlsx" />
+      <label>URL (Dropbox, Google Drive, or direct link)</label>
+      <input id="initDocUrl" placeholder="https://..." />
       <label>Description</label>
       <textarea id="initDocDesc" placeholder="Brief description of the document..." style="min-height:70px;"></textarea>
       <label>Source</label>
       <input id="initDocSource" placeholder="e.g. PowerFlex, AI Assistant, Newmark" />
     `, async () => {
       const filename = document.getElementById('initDocName').value.trim();
+      const url = document.getElementById('initDocUrl').value.trim();
       const desc = document.getElementById('initDocDesc').value.trim();
       const source = document.getElementById('initDocSource').value.trim();
       if (!filename) return alert('Document name is required');
@@ -1366,7 +1398,7 @@
         entry_type: 'document',
         title: filename,
         content: desc || null,
-        metadata: { filename, type: ext || 'unknown', source: source || null },
+        metadata: { filename, type: ext || 'unknown', source: source || null, url: url || null },
         created_by: _currentUser?.email || 'mz@firstmilecap.com'
       });
 
