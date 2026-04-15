@@ -98,6 +98,20 @@ The embedded Claude chat has access to these tools:
 - **Debits:** CSV shows debit amounts as positive — the upload code negates them (amount = -Math.abs(rawAmount) for Debits)
 - **Account mapping:** ACCOUNT_NAME_MAP in exec.html maps account numbers to names (includes Pref Fund I: 483103381654, etc.)
 
+## Active Initiatives Module
+- **What:** Project tracking module for special projects, deal activity, and communications. Built 2026-04-15.
+- **Module name:** "Active Initiatives" (sidebar + home card)
+- **Files:** `initiatives.js` (external IIFE module, same pattern as exec-v2.js), view container in index.html `#view-initiatives` → `#initRoot`
+- **DB Tables:** `initiatives` (main project), `initiative_members` (visibility/team), `initiative_entries` (chronological log: emails, notes, milestones, tasks, documents)
+- **Visibility:** Per-project membership. Only users whose email is in `initiative_members` for a given initiative can see it. Admins (`isAdmin=true`) see all. The sidebar item is visible to all users.
+- **Features:** Project cards grid with status filters (All/Active/On Hold/Completed), detail view with 3 tabs (Activity timeline, Milestones with checkboxes, Team members with roles), CRUD modals for creating/editing initiatives and adding entries/milestones/members
+- **Entry types:** email (linked from inbox with from/to/cc metadata), note, milestone (with due_date + completed toggle), task (with assignee + due_date), document
+- **Team roles:** owner, member, viewer — stored in `initiative_members.role`
+- **Seeded test project:** "41 Flatbush — Gimlet/Spotify Lease Buyout" with 26 emails from the RC/AI thread, 3 milestones, 1 pinned note. Members: rc@ (owner), mz@ (member), aiassistant@ (member)
+- **Design intent (from Morris):** When someone emails AI assistant a project question, Claude should use judgment: create a new initiative if it's a real project, add to an existing one if it's a continuation, or just reply if it's a simple question. Only email recipients (to/cc) should be added as members.
+- **`window.currentUser` exposure:** Added `Object.defineProperty` getter on `window` to expose the closure-scoped `currentUser` variable to external modules. Uses `isAdmin` (camelCase, not `is_admin`).
+- **Migration file:** `migration/create-initiatives.sql`
+
 ## Pending / Known Issues
 - **132-40 Metropolitan NOI not showing on balance sheet:** Property exists in exec_investments but shows $0 valuation. FB_PROP_META updated in index.html code, but live site needs git push. Also `fbGlAccounts` was null when trying to recompute budget data — GL accounts may not have loaded. Budget rows DO exist in Supabase (confirmed). **UPDATE 2026-03-30:** Budget data (2026+2027) seeded via `migration/seed-metropolitan-budget.sql`. NOI corrected to exclude RET (Real Estate Tax Recovery) pass-throughs: 2026 NOI = $1,124,216 ($93,684.70/mo), 2027 NOI = $1,390,000 ($115,833.33/mo per Morris). RET is tenant reimbursement that offsets RE Tax expense — not real income.
 - **Investment contribution → auto-update contributed amount:** When linking a wire to an investment via dropdown, should also increment that investment's `contributed` field. Not yet implemented.
