@@ -67,6 +67,75 @@
       #initRoot .init-status.on_hold  { background: #fef3c7; color: #92400e; }
       #initRoot .init-status.completed{ background: #dbeafe; color: #1e40af; }
       #initRoot .init-status.archived { background: #f1f5f9; color: #64748b; }
+      #initRoot .init-status.stale    { background: #fee2e2; color: #991b1b; }
+
+      /* Grouped list sections */
+      #initRoot .init-section {
+        margin-bottom: 28px;
+      }
+      #initRoot .init-section-header {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        padding: 10px 4px;
+        cursor: pointer;
+        user-select: none;
+        border-bottom: 1px solid #e2e8f0;
+        margin-bottom: 14px;
+      }
+      #initRoot .init-section-header h3 {
+        margin: 0;
+        font-size: 15px;
+        font-weight: 700;
+        color: #1e293b;
+        letter-spacing: 0.01em;
+      }
+      #initRoot .init-section-header .init-section-count {
+        background: #e2e8f0;
+        color: #475569;
+        font-size: 11px;
+        font-weight: 600;
+        padding: 2px 8px;
+        border-radius: 10px;
+      }
+      #initRoot .init-section-header .init-section-caret {
+        margin-left: auto;
+        transition: transform 0.18s ease;
+        color: #94a3b8;
+      }
+      #initRoot .init-section.collapsed .init-section-caret {
+        transform: rotate(-90deg);
+      }
+      #initRoot .init-section.collapsed .init-grid {
+        display: none;
+      }
+      #initRoot .init-section.prospective .init-section-header h3::before {
+        content: "🏗️ ";
+      }
+      #initRoot .init-section.prospective-stale .init-section-header h3::before {
+        content: "⏸️ ";
+      }
+      #initRoot .init-section.general .init-section-header h3::before {
+        content: "📋 ";
+      }
+      #initRoot .init-category-chip {
+        display: inline-block;
+        font-size: 10px;
+        font-weight: 600;
+        text-transform: uppercase;
+        letter-spacing: 0.04em;
+        padding: 2px 7px;
+        border-radius: 4px;
+        margin-right: 6px;
+      }
+      #initRoot .init-category-chip.prospective {
+        background: #eef2ff;
+        color: #4338ca;
+      }
+      #initRoot .init-category-chip.general {
+        background: #f1f5f9;
+        color: #475569;
+      }
 
       #initRoot .init-card-summary {
         font-size: 13px;
@@ -951,7 +1020,7 @@
         <div class="init-header">
           <div>
             <h2>Active Initiatives</h2>
-            <p style="font-size:13px;color:#94a3b8;margin:4px 0 0 0">Track projects, communications, and milestones</p>
+            <p style="font-size:13px;color:#94a3b8;margin:4px 0 0 0">Prospective investments, general projects, communications, and milestones</p>
           </div>
           <div style="display:flex;gap:10px;align-items:center;">
             <div class="init-filters" id="initFilters">
@@ -959,11 +1028,12 @@
               <button class="init-filter-btn" data-filter="active">Active</button>
               <button class="init-filter-btn" data-filter="on_hold">On Hold</button>
               <button class="init-filter-btn" data-filter="completed">Completed</button>
+              <button class="init-filter-btn" data-filter="stale">Stale</button>
             </div>
             <button class="init-add-btn" onclick="initNewProject()">+ New Initiative</button>
           </div>
         </div>
-        <div class="init-grid" id="initGrid"></div>
+        <div id="initSections"></div>
       </div>
 
       <!-- Detail View -->
@@ -978,6 +1048,7 @@
             <p class="init-detail-summary" id="initDetailSummary"></p>
           </div>
           <div class="init-detail-actions">
+            <button class="init-btn-outline" id="initStatusActionBtn" onclick="initQuickStatusChange()" style="display:none;"></button>
             <button class="init-btn-outline" onclick="initEditProject()">Edit</button>
             <button class="init-btn-primary" onclick="initAddEntry()">+ Add Entry</button>
           </div>
@@ -1076,26 +1147,23 @@
     _entries = entries || [];
   }
 
-  // ── Render card grid ─────────────────────────────────────
+  // ── Render grouped sections ──────────────────────────────
+  // Three collapsible sections:
+  //   1. Prospective Investments — Active (category=prospective_investment, status=active|on_hold)
+  //   2. Prospective Investments — Stale / Not Closed (category=prospective_investment, status=stale|archived)
+  //   3. General Initiatives (category=general, any status)
   function _renderGrid(filter = 'all') {
-    const grid = document.getElementById('initGrid');
-    if (!grid) return;
+    const host = document.getElementById('initSections');
+    if (!host) return;
 
+    // Apply top-level status filter first (still supports the old filter chips)
     let list = _initiatives;
-    if (filter !== 'all') list = list.filter(i => i.status === filter);
-
-    if (list.length === 0) {
-      grid.innerHTML = `
-        <div class="init-empty" style="grid-column:1/-1;">
-          <div class="init-empty-icon">📋</div>
-          <h3>${filter === 'all' ? 'No initiatives yet' : 'No ' + filter.replace('_', ' ') + ' initiatives'}</h3>
-          <p>${filter === 'all' ? 'Create your first initiative to start tracking projects and communications.' : 'Try a different filter or create a new initiative.'}</p>
-        </div>
-      `;
-      return;
+    if (filter !== 'all') {
+      list = list.filter(i => i.status === filter);
     }
 
-    grid.innerHTML = list.map(init => {
+    // Helper: build a card
+    const _card = (init) => {
       const memberCount = _members.filter(m => m.initiative_id === init.id).length;
       const entryCount = _entries.filter(e => e.initiative_id === init.id).length;
       const latestEntry = _entries.find(e => e.initiative_id === init.id);
@@ -1103,7 +1171,6 @@
         ? Math.floor((Date.now() - new Date(latestEntry.created_at)) / 86400000)
         : Math.floor((Date.now() - new Date(init.created_at)) / 86400000);
       const lastActivity = daysAgo === 0 ? 'Today' : daysAgo === 1 ? 'Yesterday' : daysAgo + 'd ago';
-
       return `
         <div class="init-card" onclick="initOpenProject('${init.id}')">
           <div class="init-card-header">
@@ -1127,8 +1194,94 @@
           </div>
         </div>
       `;
-    }).join('');
+    };
+
+    // Partition by category + status
+    const isProspective = (i) => i.category === 'prospective_investment';
+    const isStaleish    = (i) => i.status === 'stale' || i.status === 'archived';
+
+    const prospectiveActive = list.filter(i => isProspective(i) && !isStaleish(i));
+    const prospectiveStale  = list.filter(i => isProspective(i) && isStaleish(i));
+    const general           = list.filter(i => !isProspective(i));
+
+    // If nothing at all
+    if (list.length === 0) {
+      host.innerHTML = `
+        <div class="init-empty" style="grid-column:1/-1;">
+          <div class="init-empty-icon">📋</div>
+          <h3>${filter === 'all' ? 'No initiatives yet' : 'No ' + filter.replace('_', ' ') + ' initiatives'}</h3>
+          <p>${filter === 'all' ? 'Create your first initiative to start tracking projects and communications.' : 'Try a different filter or create a new initiative.'}</p>
+        </div>
+      `;
+      return;
+    }
+
+    // Section builder (staleCollapsed default = true for prospective-stale)
+    const _section = (key, titleText, items, collapsedDefault) => {
+      if (items.length === 0) return '';
+      const collapsed = collapsedDefault ? 'collapsed' : '';
+      return `
+        <div class="init-section ${key} ${collapsed}" data-section="${key}">
+          <div class="init-section-header" onclick="initToggleSection('${key}')">
+            <h3>${titleText}</h3>
+            <span class="init-section-count">${items.length}</span>
+            <svg class="init-section-caret" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg>
+          </div>
+          <div class="init-grid">${items.map(_card).join('')}</div>
+        </div>
+      `;
+    };
+
+    host.innerHTML = [
+      _section('prospective',       'Prospective Investments — Active',            prospectiveActive, false),
+      _section('prospective-stale', 'Prospective Investments — Stale / Not Closed', prospectiveStale,  true),
+      _section('general',           'General Initiatives',                         general,           false),
+    ].join('');
   }
+
+  // Toggle a section's collapsed state
+  function _toggleSection(key) {
+    const el = document.querySelector(`#initSections .init-section[data-section="${key}"]`);
+    if (el) el.classList.toggle('collapsed');
+  }
+  window.initToggleSection = _toggleSection;
+
+  // Show/hide the quick status action button based on current initiative
+  function _updateStatusActionBtn() {
+    const btn = document.getElementById('initStatusActionBtn');
+    if (!btn || !_currentInitiative) return;
+    const c = _currentInitiative;
+    const isProspective = c.category === 'prospective_investment';
+    // Only expose quick-stale action on prospective investments
+    if (!isProspective) { btn.style.display = 'none'; return; }
+    if (c.status === 'stale') {
+      btn.textContent = '↻ Reactivate';
+      btn.dataset.action = 'reactivate';
+    } else {
+      btn.textContent = '⏸️ Mark Stale';
+      btn.dataset.action = 'stale';
+    }
+    btn.style.display = '';
+  }
+
+  async function _quickStatusChange() {
+    if (!_currentInitiative) return;
+    const btn = document.getElementById('initStatusActionBtn');
+    const action = btn?.dataset?.action;
+    const newStatus = action === 'reactivate' ? 'active' : 'stale';
+    const label = action === 'reactivate' ? 'Reactivate this initiative?' : 'Mark this deal as Stale / Not Closed?';
+    if (!confirm(label)) return;
+    await window.supaWrite('initiatives', 'PATCH', {
+      status: newStatus, updated_at: new Date().toISOString()
+    }, `?id=eq.${_currentInitiative.id}`);
+    _currentInitiative.status = newStatus;
+    _updateStatusActionBtn();
+    await _loadData();
+    _currentInitiative = _initiatives.find(i => i.id === _currentInitiative.id);
+    _renderGrid(document.querySelector('#initFilters .init-filter-btn.active')?.dataset.filter || 'all');
+    _toast(newStatus === 'stale' ? 'Marked as Stale' : 'Reactivated');
+  }
+  window.initQuickStatusChange = _quickStatusChange;
 
   // ── Detail view ──────────────────────────────────────────
   function _openProject(id) {
@@ -1141,6 +1294,7 @@
 
     document.getElementById('initDetailTitle').textContent = _currentInitiative.name;
     document.getElementById('initDetailSummary').textContent = _currentInitiative.summary || '';
+    _updateStatusActionBtn();
 
     // Reset to overview tab (default landing)
     document.querySelectorAll('#initRoot .init-tab').forEach(t => t.classList.remove('active'));
@@ -1795,6 +1949,11 @@
   // ── CRUD: New Initiative ─────────────────────────────────
   async function _newProject() {
     _showModal('New Initiative', `
+      <label>Category</label>
+      <select id="initNewCategory">
+        <option value="general">General Initiative (default)</option>
+        <option value="prospective_investment">Prospective Investment (deal we may close)</option>
+      </select>
       <label>Name</label>
       <input id="initNewName" placeholder="e.g. Gimlet/Spotify Buyout Analysis" />
       <label>Summary</label>
@@ -1808,11 +1967,12 @@
       const name = document.getElementById('initNewName').value.trim();
       const summary = document.getElementById('initNewSummary').value.trim();
       const status = document.getElementById('initNewStatus').value;
+      const category = document.getElementById('initNewCategory').value;
       if (!name) return alert('Name is required');
 
       const email = _currentUser?.email || 'mz@firstmilecap.com';
       const [created] = await window.supaWrite('initiatives', 'POST', {
-        name, summary, status, created_by: email
+        name, summary, status, category, created_by: email
       });
 
       // Add creator as owner
@@ -1833,7 +1993,13 @@
   async function _editProject() {
     if (!_currentInitiative) return;
     const c = _currentInitiative;
+    const curCat = c.category || 'general';
     _showModal('Edit Initiative', `
+      <label>Category</label>
+      <select id="initEditCategory">
+        <option value="general" ${curCat === 'general' ? 'selected' : ''}>General Initiative</option>
+        <option value="prospective_investment" ${curCat === 'prospective_investment' ? 'selected' : ''}>Prospective Investment</option>
+      </select>
       <label>Name</label>
       <input id="initEditName" value="${_esc(c.name)}" />
       <label>Summary</label>
@@ -1843,16 +2009,18 @@
         <option value="active" ${c.status === 'active' ? 'selected' : ''}>Active</option>
         <option value="on_hold" ${c.status === 'on_hold' ? 'selected' : ''}>On Hold</option>
         <option value="completed" ${c.status === 'completed' ? 'selected' : ''}>Completed</option>
+        <option value="stale" ${c.status === 'stale' ? 'selected' : ''}>Stale / Not Closed</option>
         <option value="archived" ${c.status === 'archived' ? 'selected' : ''}>Archived</option>
       </select>
     `, async () => {
       const name = document.getElementById('initEditName').value.trim();
       const summary = document.getElementById('initEditSummary').value.trim();
       const status = document.getElementById('initEditStatus').value;
+      const category = document.getElementById('initEditCategory').value;
       if (!name) return alert('Name is required');
 
       await window.supaWrite('initiatives', 'PATCH', {
-        name, summary, status, updated_at: new Date().toISOString()
+        name, summary, status, category, updated_at: new Date().toISOString()
       }, `?id=eq.${c.id}`);
 
       _closeModal();
