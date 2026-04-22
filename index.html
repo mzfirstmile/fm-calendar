@@ -5113,7 +5113,7 @@ You have your own phone number: +1 (866) 568-4445. You can send and search SMS m
     // KPI strip
     const projectedGrowth = fc.endingCash > fc.starting.total;
     const endingReserve = fc.rows[fc.rows.length - 1].reserveBalance;
-    let html = `<div class="cf-kpi-row">
+    let html = `<div class="fb-kpi-grid">
       <div class="fb-kpi-card" style="border-left:4px solid var(--green)">
         <div class="fb-kpi-label">Property Cash (Today)</div>
         <div class="fb-kpi-value">${fmtK(fc.starting.total)}</div>
@@ -5170,32 +5170,55 @@ You have your own phone number: +1 (866) 568-4445. You can send and search SMS m
     const chartW = W - padL - padR;
     const chartH = H - padT - padB;
 
-    // Y-axis: cash balance. Scale must fit both the cash line AND the reserve line.
-    const allCash = fc.rows.map(r => r.endingCash)
-      .concat(fc.rows.map(r => r.reserveBalance))
-      .concat([fc.starting.total, fc.starting.reserve]);
-    const maxCash = Math.max(...allCash, 1);
-    const minCash = Math.min(...allCash, 0);
-    const rangeCash = Math.max(maxCash - minCash, 1);
+    // Single unified Y-axis. Range must cover:
+    //   • cash balance line (can swing below zero)
+    //   • reserve balance line
+    //   • monthly inflow bars (extending UP from zero)
+    //   • monthly outflow bars (extending DOWN from zero, shown as -totalOut)
+    const barInMax = fc.rows.reduce((m, r) => Math.max(m,
+      r.totalIn + (r.cap_reserveDraw || 0) + (r.cap_contrib > 0 ? r.cap_contrib : 0)), 0);
+    const barOutMax = fc.rows.reduce((m, r) => Math.max(m,
+      r.totalOut + Math.abs(r.cap_tilc || 0) + Math.abs(r.cap_capex || 0)
+      + Math.abs(r.cap_distrib || 0) + (r.cap_other < 0 ? Math.abs(r.cap_other) : 0)), 0);
 
-    // Bar baseline at ~55% down (below line chart, above min)
-    // Use a separate scale for bars: ±max(inflow, outflow) mapped to ±40px around baseline y=chartMid.
-    const barMaxAbs = fc.rows.reduce((m, r) => Math.max(m, r.totalIn + r.cap_reserveDraw + (r.cap_contrib > 0 ? r.cap_contrib : 0),
-      r.totalOut + Math.abs(r.cap_tilc) + Math.abs(r.cap_capex) + Math.abs(r.cap_distrib)), 1);
-    const barBaselineY = padT + chartH * 0.62;
-    const barPxPerDollar = (chartH * 0.28) / barMaxAbs;  // up to 28% of chart height
+    const allVals = fc.rows.map(r => r.endingCash)
+      .concat(fc.rows.map(r => r.reserveBalance))
+      .concat([fc.starting.total, fc.starting.reserve, 0, barInMax, -barOutMax]);
+    const rawMax = Math.max(...allVals);
+    const rawMin = Math.min(...allVals);
+    // Pad 10% on each side
+    const pad = (rawMax - rawMin) * 0.08 || 1;
+    const maxCash = rawMax + pad;
+    const minCash = rawMin - pad;
+    const rangeCash = maxCash - minCash;
 
     const xOf = (i) => padL + ((i + 0.5) / 12) * chartW;
     const yCash = (v) => padT + chartH - ((v - minCash) / rangeCash) * chartH;
+    const barBaselineY = yCash(0);              // bars pivot on actual zero, on the cash axis
+    const barPxPerDollar = chartH / rangeCash;  // same scale as the line
 
-    // Gridlines (cash)
-    const ySteps = [0, 0.25, 0.5, 0.75, 1];
-    const fmtAxis = (v) => Math.abs(v) >= 1e6 ? '$' + (v / 1e6).toFixed(1) + 'M' : '$' + Math.round(v / 1000) + 'K';
-    const gridLines = ySteps.map(t => {
-      const v = minCash + rangeCash * (1 - t);
+    // Gridlines (cash). Use "nice" round steps, guaranteed to include $0 if it's in range.
+    const fmtAxis = (v) => Math.abs(v) >= 1e6 ? '$' + (v / 1e6).toFixed(1) + 'M' : (v === 0 ? '$0' : '$' + Math.round(v / 1000) + 'K');
+    const niceStep = (range) => {
+      const rough = range / 5;
+      const pow10 = Math.pow(10, Math.floor(Math.log10(rough)));
+      const mult = rough / pow10;
+      const niceMult = mult < 1.5 ? 1 : mult < 3 ? 2 : mult < 7 ? 5 : 10;
+      return niceMult * pow10;
+    };
+    const step = niceStep(rangeCash);
+    const tickVals = [];
+    const firstTick = Math.ceil(minCash / step) * step;
+    for (let v = firstTick; v <= maxCash; v += step) tickVals.push(v);
+    // Ensure $0 is included if in range
+    if (minCash < 0 && maxCash > 0 && !tickVals.includes(0)) tickVals.push(0);
+    tickVals.sort((a, b) => a - b);
+
+    const gridLines = tickVals.map(v => {
       const y = yCash(v);
-      return `<line x1="${padL}" y1="${y}" x2="${W - padR}" y2="${y}" stroke="#d4dbe8" stroke-width="1"/>
-              <text x="${padL - 5}" y="${y + 3}" text-anchor="end" font-size="9.5" fill="#6b7d96">${fmtAxis(v)}</text>`;
+      const isZero = (v === 0);
+      return `<line x1="${padL}" y1="${y}" x2="${W - padR}" y2="${y}" stroke="${isZero ? '#6b7d96' : '#d4dbe8'}" stroke-width="${isZero ? 1.2 : 1}" opacity="${isZero ? 0.6 : 1}"/>
+              <text x="${padL - 5}" y="${y + 3}" text-anchor="end" font-size="9.5" fill="${isZero ? '#1e2d44' : '#6b7d96'}" font-weight="${isZero ? '600' : '400'}">${fmtAxis(v)}</text>`;
     }).join('');
 
     // X labels
@@ -5203,8 +5226,7 @@ You have your own phone number: +1 (866) 568-4445. You can send and search SMS m
       `<text x="${xOf(i)}" y="${H - 14}" text-anchor="middle" font-size="10" fill="#6b7d96">${r.monthName}</text>`
     ).join('');
 
-    // Bar baseline
-    const barBase = `<line x1="${padL}" y1="${barBaselineY}" x2="${W - padR}" y2="${barBaselineY}" stroke="#6b7d96" stroke-width="0.8" opacity="0.3"/>`;
+    // Bar baseline = $0 gridline, already rendered above
 
     // Monthly bars + cumulative cash line
     const barW = Math.max(chartW / 12 * 0.55, 14);
@@ -5273,7 +5295,6 @@ You have your own phone number: +1 (866) 568-4445. You can send and search SMS m
       </div>
       <svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" style="width:100%;height:340px;display:block">
         ${gridLines}
-        ${barBase}
         ${bars}
         ${reserveLine}
         ${reserveStartDot}${reserveDots}
