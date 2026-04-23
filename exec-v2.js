@@ -3483,7 +3483,7 @@ async function loadBalanceSheet() {
       supaFetch('exec_investments', '?order=name.asc'),
       supaFetch('exec_liabilities', '?order=maturity_date.asc.nullslast'),
       supaFetch('properties', '?order=property_name.asc&select=id,property_name,current_valuation'),
-      supaFetch('balance_sheet_items', '?is_header=eq.false&is_total=eq.false&select=property_id,bs_code,amount,account_section,account_name'),
+      supaFetch('balance_sheet_items', '?is_header=eq.false&is_total=eq.false&select=property_id,bs_code,amount,account_section,account_name,period'),
       fetchJpyRate()
     ]);
     bsProperties = props;
@@ -3492,10 +3492,21 @@ async function loadBalanceSheet() {
     const propLookup = {};
     props.forEach(p => { propLookup[p.id] = { name: p.property_name, valuation: p.current_valuation }; });
 
+    // Keep only the LATEST period per property (handles case where
+    // multiple monthly balance sheets are loaded)
+    const latestPeriodByProp = {};
+    bsItems.forEach(item => {
+      if (!latestPeriodByProp[item.property_id] ||
+          String(item.period) > String(latestPeriodByProp[item.property_id])) {
+        latestPeriodByProp[item.property_id] = item.period;
+      }
+    });
+    const bsItemsLatest = bsItems.filter(i => i.period === latestPeriodByProp[i.property_id]);
+
     // Compute total mortgage debt per property from balance sheet items
     // Only include mortgage/notes payable (typically BS 2100-2199), not AP or accrued expenses
     propertyDebt = {};
-    bsItems.forEach(item => {
+    bsItemsLatest.forEach(item => {
       const code = parseInt(item.bs_code) || 0;
       const name = (item.account_name || '').toLowerCase();
       const isMortgage = (code >= 2100 && code < 2200) ||

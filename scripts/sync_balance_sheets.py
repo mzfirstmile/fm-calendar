@@ -211,11 +211,53 @@ def all_balance_sheets(folder: Path) -> list[Path]:
     return out
 
 
+def parse_period_from_name(filename: str) -> tuple[int, int] | None:
+    """Extract (year, month) from a filename. Same logic as sync_actuals.py."""
+    s = filename
+    m = re.search(r"\bQ([1-4])\s+(\d{4})", s, re.I)
+    if m:
+        return (int(m.group(2)), int(m.group(1)) * 3)
+    m = re.search(r"(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)\w*\s*(\d{2,4})", s, re.I)
+    if m:
+        mo = MONTH_ABBR[m.group(1).lower()[:3]]
+        yr = int(m.group(2))
+        yr = yr if yr >= 1900 else 2000 + yr
+        return (yr, mo)
+    m = re.search(r"\b(\d{1,2})[\.\-/](\d{1,2})[\.\-/](\d{2,4})\b", s)
+    if m:
+        mo = int(m.group(1))
+        yr = int(m.group(3))
+        yr = yr if yr >= 1900 else 2000 + yr
+        if 1 <= mo <= 12 and yr >= 2020:
+            return (yr, mo)
+    m = re.search(r"\b(\d{1,2})\.(\d{4})\b", s)
+    if m:
+        mo = int(m.group(1))
+        yr = int(m.group(2))
+        if 1 <= mo <= 12:
+            return (yr, mo)
+    m = re.search(r"(\d{4})-(\d{1,2})-(\d{1,2})", s)
+    if m:
+        return (int(m.group(1)), int(m.group(2)))
+    return None
+
+
 def latest_balance_sheet(folder: Path) -> Path | None:
+    """Return the balance sheet xlsx with the newest PERIOD (not newest mtime).
+    A file 'Balance_Sheet 03.31.26.xlsx' beats 'Balance_Sheet 12.31.2025.xlsx'
+    even if the latter was refreshed more recently."""
     files = all_balance_sheets(folder)
     if not files:
         return None
-    files.sort(key=lambda p: os.path.getmtime(p), reverse=True)
+
+    def sort_key(p: Path):
+        period = parse_period_from_name(p.name)
+        if period:
+            # Prefer files WITH a parseable period; newer period wins
+            return (1, period[0], period[1], os.path.getmtime(p))
+        return (0, 0, 0, os.path.getmtime(p))
+
+    files.sort(key=sort_key, reverse=True)
     return files[0]
 
 
@@ -288,12 +330,180 @@ def read_supabase_config() -> tuple[str, str]:
 # ─────────────────────────────────────────────────────────────────────────
 # Parser
 # ─────────────────────────────────────────────────────────────────────────
+#  Known account-name → bs_code map extracted from data/setup_balance_sheet.sql
+#  Unknown accounts get synthetic codes generated at parse time.
+NAME_TO_BS_CODE = {
+    "assets": "1000",
+    "cash": "1001",
+    "operating cash": "1010",
+    "flagstar bank": "1012",
+    "capital one": "1013",
+    "jpm lockbox": "1014",
+    "flagstar lockbox": "1015",
+    "depository cash": "1020",
+    "pnc bank clearing account": "1021",
+    "security deposit cash": "1030",
+    "escrow cash": "1050",
+    "money market account": "1060",
+    "pnc bank": "1062",
+    "checking account ii": "1063",
+    "petty cash": "1080",
+    "total cash": "1090",
+    "escrow": "1100",
+    "escrow - taxes": "1110",
+    "escrow - insurance": "1120",
+    "req reserves for ti & leasing": "1121",
+    "req reserves for ti & leasing (2)": "1128",
+    "req reserve for repairs": "1122",
+    "req reserve - spec.tt": "1123",
+    "req reserve for taxes": "1124",
+    "req reserve for misc": "1125",
+    "cash- exchange/reserve": "1126",
+    "cash - escrow loc/gr lease": "1127",
+    "escrow - pnc cash holdback": "1129",
+    "escrow - ground rent": "1130",
+    "escrow - replacement reserve": "1131",
+    "operating expense escrow": "1132",
+    "partners reserve": "1133",
+    "escrow - bulk sale escrow": "1134",
+    "reserve millennium ti work": "1135",
+    "total escrow": "1190",
+    "accounts receivable": "1200",
+    "other receivables": "1230",
+    "suspense": "1280",
+    "total accounts receivable": "1290",
+    "other current assets": "1300",
+    "prepaid insurance - property": "1310",
+    "prepaid insurance - liability": "1311",
+    "prepaid insurance - umbrella": "1312",
+    "prepaid insurance - other": "1313",
+    "prepaid real estate taxes": "1320",
+    "prepaid expenses": "1325",
+    "total other current assets": "1390",
+    "property": "1400",
+    "purchase price credit (reduction)": "1402",
+    "land": "1410",
+    "acquisition costs - land": "1411",
+    "buildings": "1420",
+    "acquisition costs - building": "1421",
+    "acquisition costs": "1423",
+    "equipment": "1424",
+    "land improvements": "1430",
+    "building improvements": "1440",
+    "tenant improvements": "1441",
+    "furniture & fixtures": "1450",
+    "ad - building": "1480",
+    "ad - land improvements": "1481",
+    "ad - building improvements": "1482",
+    "ad - tenant improvements": "1483",
+    "ad - equipment": "1484",
+    "ad - acquisition cost": "1485",
+    "total property": "1490",
+    "other assets": "1600",
+    "utility deposits": "1610",
+    "loan costs": "1650",
+    "aa - loan costs": "1651",
+    "deferred leasing commissions": "1667",
+    "a/a deferred leasing commissions": "1668",
+    "total other assets": "1690",
+    "total assets": "1990",
+    "liabilities and capital": "2000",
+    "liabilities": "2001",
+    "accounts payable": "2002",
+    "prepaid rent": "2020",
+    "tenant deposits": "2050",
+    "due to/from seller/buyer": "2070",
+    "total accounts payable": "2090",
+    "accrued liabilities": "2100",
+    "accrued mortgage interest": "2130",
+    "accrued expenses & other payables": "2150",
+    "total accrued liabilities": "2190",
+    "sales tax collected": "2310",
+    "short-term liability": "2450",
+    "short-term loan": "2451",
+    "total short-term liability": "2499",
+    "long term liabilities": "2500",
+    "long-term liabilities": "2500",
+    "mortgage payable": "2510",
+    "total long term liabilities": "2590",
+    "total liabilities": "2990",
+    "capital": "3000",
+    "equity": "3000",
+    "capital contribution - dra": "3110",
+    "distributions - dra": "3120",
+    "capital contributions - fm plaza": "3210",
+    "distributions - fm plaza": "3220",
+    "investment capital": "3230",
+    "owner draw": "3231",
+    "owner draw - partner": "3232",
+    "loan from pref fund ii": "3233",
+    "preferred distribution": "3234",
+    "current year net income": "3790",
+    "retained earnings": "3800",
+    "total capital": "3890",
+    "total equity": "3890",
+    "total liabilities and capital": "3990",
+    "total liabilities and equity": "3990",
+}
+
+
+def normalize_name(s: str) -> str:
+    """Normalize an account name for map lookup."""
+    s = (s or "").strip().lower()
+    s = re.sub(r"\s+", " ", s)
+    return s
+
+
+# ── Section detection (account_type + account_section context) ──────
+# As we walk the file we maintain a "current context" that we apply to
+# leaf rows. Section header rows (UPPERCASE, no amount) change the context.
+SECTION_HINTS = [
+    ("ASSETS",                   "asset",      None),
+    ("LIABILITIES AND CAPITAL",  None,         None),              # just a super-header
+    ("LIABILITIES AND EQUITY",   None,         None),
+    ("LIABILITIES",              "liability",  None),
+    ("CAPITAL",                  "equity",     "equity"),
+    ("EQUITY",                   "equity",     "equity"),
+    ("CASH",                     "asset",      "cash"),
+    ("ESCROW",                   "asset",      "escrow"),
+    ("ACCOUNTS RECEIVABLE",      "asset",      "accounts_receivable"),
+    ("OTHER CURRENT ASSETS",     "asset",      "prepaid"),
+    ("PROPERTY",                 "asset",      "fixed_assets"),
+    ("OTHER ASSETS",             "asset",      "other_assets"),
+    ("ACCOUNTS PAYABLE",         "liability",  "accounts_payable"),
+    ("ACCRUED LIABILITIES",      "liability",  "accrued_liabilities"),
+    ("SHORT-TERM LIABILITY",     "liability",  "other_liabilities"),
+    ("SHORT TERM LIABILITIES",   "liability",  "other_liabilities"),
+    ("LONG TERM LIABILITIES",    "liability",  "long_term_debt"),
+    ("LONG-TERM LIABILITIES",    "liability",  "long_term_debt"),
+]
+
+
+def detect_section(upper: str) -> tuple[str | None, str | None]:
+    """Return (account_type_hint, account_section_hint) or (None, None)."""
+    for keyword, atype, sect in SECTION_HINTS:
+        if upper == keyword or upper.startswith(keyword + " "):
+            return (atype, sect)
+    return (None, None)
+
+
 def parse_balance_sheet(path: Path) -> dict[str, Any]:
     """Parse a Yardi Balance Sheet xlsx.
 
+    Real format (as of April 2026):
+      Row 1: Balance Sheet
+      Row 2: Property = <Name> (pXXXXXXX)
+      Row 3: Period = MM/YYYY - MM/YYYY
+      Row 4: Book = ...
+      Row 5: ACCOUNT | CURRENT BALANCE
+      Row 6+: data rows, col 0 = indented account name, col 1 = amount.
+              Section headers (ASSETS, CASH, ESCROW, etc.) are uppercase
+              and have no amount.
+
     Returns:
         property_code, property_name, year, month, period (YYYY-MM),
-        rows: [{bs_code, account_name, amount, is_header, is_total}],
+        rows: [{bs_code, account_name, amount, is_header, is_total,
+                account_type, account_section, sort_order}],
         source_file
     """
     wb = openpyxl.load_workbook(path, data_only=True)
@@ -309,7 +519,6 @@ def parse_balance_sheet(path: Path) -> dict[str, Any]:
     for i, row in enumerate(all_rows):
         if not row:
             continue
-        # Look for property line (col 0)
         c0 = row[0]
         if c0 is not None:
             s = str(c0).strip()
@@ -318,39 +527,39 @@ def parse_balance_sheet(path: Path) -> dict[str, Any]:
                 property_name = m_prop.group(1).strip()
                 property_code = m_prop.group(2).strip().lower()
                 continue
-            # Period parsing — several variants: "Period = Jan 2026", "As Of 1/31/2026", "Period Ending..."
-            if re.search(r"period|as\s+of|as-of|ending", s, re.I):
+            if s.lower().startswith("period"):
                 m = re.search(
-                    r"(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)\w*\s+(\d{4})",
-                    s, re.I,
+                    r"(\d{1,2})/(\d{4})\s*[-–]\s*(\d{1,2})/(\d{4})", s
                 )
                 if m:
-                    month = MONTH_ABBR[m.group(1).lower()[:3]]
-                    year = int(m.group(2))
+                    # Use END of period (second month/year)
+                    month = int(m.group(3))
+                    year = int(m.group(4))
                 else:
-                    m2 = re.search(r"(\d{1,2})/(\d{1,2})/(\d{2,4})", s)
-                    if m2:
-                        month = int(m2.group(1))
-                        yr = int(m2.group(3))
-                        year = yr if yr >= 1900 else 2000 + yr
+                    m = re.search(r"(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)\w*\s+(\d{4})", s, re.I)
+                    if m:
+                        month = MONTH_ABBR[m.group(1).lower()[:3]]
+                        year = int(m.group(2))
                 continue
-
-        # Header row: look for a cell that says "balance", "amount", "ytd",
-        # or matches "period to date" / "year to date" (same as income stmt).
         cells = [str(c).strip().lower() if c is not None else "" for c in row]
         joined = " | ".join(cells)
-        if ("balance" in joined or "amount" in joined or "year to date" in joined
-                or "period to date" in joined) and any(cells):
-            # Pick the rightmost column that contains "balance" or "year to date"
-            for j in range(len(cells) - 1, -1, -1):
-                if any(k in cells[j] for k in ("year to date", "ytd", "balance", "amount", "period to date")):
+        if "account" in joined and ("balance" in joined or "amount" in joined):
+            # Pick first non-"account" column that contains "balance" or "amount"
+            for j, c in enumerate(cells):
+                if c and c != "account" and ("balance" in c or "amount" in c):
                     amount_col = j
                     break
+            if amount_col is None:
+                # Fall back to second column
+                amount_col = 1
             header_row_idx = i
             break
 
-    if header_row_idx is None or amount_col is None:
-        raise ValueError(f"Could not locate amount column in {path.name}. Inspect structure manually.")
+    if header_row_idx is None:
+        raise ValueError(f"Could not locate header row in {path.name}")
+    if amount_col is None:
+        amount_col = 1
+
     if not property_code:
         m = re.search(r"(p\d{7})", path.name, re.I)
         if m:
@@ -358,7 +567,7 @@ def parse_balance_sheet(path: Path) -> dict[str, Any]:
     if not property_code:
         raise ValueError(f"Could not determine property code from {path.name}")
 
-    # Period fallback — try to parse from filename, e.g. "Balance_Sheet 03.31.26.xlsx"
+    # Period fallback — try to parse from filename
     if not (year and month):
         m = re.search(r"(\d{1,2})[\.\-/](\d{1,2})[\.\-/](\d{2,4})", path.name)
         if m:
@@ -370,43 +579,85 @@ def parse_balance_sheet(path: Path) -> dict[str, Any]:
 
     period = f"{year:04d}-{month:02d}"
 
+    # ── Walk data rows with section context ─────────────────────────
     rows: list[dict[str, Any]] = []
     sort_order = 0
+    cur_type: str | None = None
+    cur_section: str | None = None
+    synthetic_counter = 9000  # for accounts not in NAME_TO_BS_CODE map
+
     for row in all_rows[header_row_idx + 1 :]:
-        if not row or row[0] is None:
+        if not row:
             continue
-        c0 = str(row[0]).strip()
-        m = re.match(r"^(\d{4})$", c0)
-        if not m:
+        c0 = row[0]
+        if c0 is None:
             continue
-        bs_code = c0
-        acct_name = (str(row[1]).strip() if len(row) > 1 and row[1] is not None else "")
-        acct_name = re.sub(r"^\s+", "", acct_name)
+        name_raw = str(c0)
+        # Preserve leading spaces to understand indent depth (Yardi uses leading spaces)
+        name_stripped = name_raw.strip()
+        if not name_stripped:
+            continue
+
+        upper = name_stripped.upper()
         amount_val = row[amount_col] if amount_col < len(row) else None
+
+        # Is this a section header? (no amount + recognizable keyword)
+        amount_is_empty = (amount_val is None or amount_val == "")
+        type_hint, section_hint = detect_section(upper)
+        if amount_is_empty and (type_hint is not None or section_hint is not None):
+            if type_hint is not None:
+                cur_type = type_hint
+            if section_hint is not None:
+                cur_section = section_hint
+            # Also record the header row itself so the UI can display section titles
+            norm = normalize_name(name_stripped)
+            bs_code = NAME_TO_BS_CODE.get(norm)
+            if bs_code:
+                sort_order += 10
+                rows.append({
+                    "bs_code": bs_code,
+                    "account_name": name_stripped,
+                    "amount": 0.0,
+                    "is_header": True,
+                    "is_total": False,
+                    "account_type": cur_type or "unknown",
+                    "account_section": cur_section or "unknown",
+                    "sort_order": sort_order,
+                })
+            continue
+
+        # Parse amount
         try:
             amount = float(amount_val) if amount_val not in (None, "") else 0.0
         except (TypeError, ValueError):
             amount = 0.0
 
-        # Infer header/total from account name heuristics.
-        # (Yardi exports don't mark Head/Tot in the balance sheet file.)
-        upper = acct_name.upper()
-        is_header = (
-            bs_code.endswith("00") and not any(ch.isdigit() for ch in upper)
-            and (not upper.startswith("TOTAL")) and amount == 0
-        )
         is_total = upper.startswith("TOTAL")
+        norm = normalize_name(name_stripped)
+        bs_code = NAME_TO_BS_CODE.get(norm)
+        if not bs_code:
+            # Unknown account — generate synthetic code within the current section.
+            # Prefix with the section's base code (10 for cash, 11 for escrow, ...)
+            base = {"cash":"10","escrow":"11","accounts_receivable":"12","prepaid":"13",
+                    "fixed_assets":"14","other_assets":"16","accounts_payable":"20",
+                    "accrued_liabilities":"21","long_term_debt":"25","equity":"30"}.get(cur_section, "99")
+            synthetic_counter += 1
+            bs_code = f"{base}{synthetic_counter}"
+
+        # Apply section context; override with bs_section() if it disagrees
+        atype_from_code, sect_from_code = bs_section(bs_code)
+        account_type = cur_type or atype_from_code
+        account_section = cur_section or sect_from_code
 
         sort_order += 10
-        atype, sect = bs_section(bs_code)
         rows.append({
             "bs_code": bs_code,
-            "account_name": acct_name or f"GL {bs_code}",
+            "account_name": name_stripped,
             "amount": round(amount, 2),
-            "is_header": is_header,
+            "is_header": False,
             "is_total": is_total,
-            "account_type": atype,
-            "account_section": sect,
+            "account_type": account_type,
+            "account_section": account_section,
             "sort_order": sort_order,
         })
 

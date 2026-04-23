@@ -4094,7 +4094,21 @@ You have your own phone number: +1 (866) 568-4445. You can send and search SMS m
 
     try {
       console.log('Fetching balance sheet for property:', propId);
-      const items = await supaFetch('balance_sheet_items', `?property_id=eq.${propId}&order=sort_order.asc`);
+      // First, find the LATEST period for this property
+      const latest = await supaFetch(
+        'balance_sheet_items',
+        `?property_id=eq.${propId}&select=period&order=period.desc&limit=1`
+      );
+      const latestPeriod = latest[0]?.period;
+      if (!latestPeriod) {
+        body.innerHTML = '<div style="text-align:center;padding:40px;color:var(--text-dim)">No balance sheet data available for this property.</div>';
+        return;
+      }
+      // Fetch only that period's rows
+      const items = await supaFetch(
+        'balance_sheet_items',
+        `?property_id=eq.${propId}&period=eq.${latestPeriod}&order=sort_order.asc`
+      );
       if (!items.length) {
         body.innerHTML = '<div style="text-align:center;padding:40px;color:var(--text-dim)">No balance sheet data available for this property.</div>';
         return;
@@ -4138,8 +4152,13 @@ You have your own phone number: +1 (866) 568-4445. You can send and search SMS m
         return html;
       }
 
-      const period = items[0]?.period || '2025-12';
-      const periodLabel = period === '2025-12' ? 'December 2025' : period;
+      // Format period label nicely: "2026-03" → "March 2026"
+      const periodLabel = (() => {
+        const m = /^(\d{4})-(\d{2})$/.exec(latestPeriod || '');
+        if (!m) return latestPeriod;
+        const monthNames = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+        return `${monthNames[parseInt(m[2]) - 1]} ${m[1]}`;
+      })();
 
       let html = `<div style="margin-bottom:8px;font-size:12px;color:var(--text-dim)">Period: <strong>${periodLabel}</strong></div>`;
       html += '<div class="bs-grid">';
@@ -4923,7 +4942,7 @@ You have your own phone number: +1 (866) 568-4445. You can send and search SMS m
     let cache = fbCashForecastCache[propId];
     if (!cache) {
       try {
-        const [rentRoll, events, cash, liabilities] = await Promise.all([
+        const [rentRoll, events, cashOverride, liabilities, bsLatest] = await Promise.all([
           supaFetch('rent_roll', `?property_id=eq.${encodeURIComponent(propId)}&limit=1000`)
             .catch(() => []),
           supaFetch('cash_forecast_events', `?property_id=eq.${encodeURIComponent(propId)}&limit=1000`)
@@ -4932,8 +4951,27 @@ You have your own phone number: +1 (866) 568-4445. You can send and search SMS m
             .catch(() => []),
           supaFetch('exec_liabilities', `?related_deal=ilike.*${encodeURIComponent(propName.split(' ')[0])}*&limit=20`)
             .catch(() => []),
+          // Pull balance_sheet_items for the latest period so we can derive
+          // starting cash automatically from the books.
+          (async () => {
+            const latest = await supaFetch(
+              'balance_sheet_items',
+              `?property_id=eq.${encodeURIComponent(propId)}&select=period&order=period.desc&limit=1`
+            ).catch(() => []);
+            const period = latest[0]?.period;
+            if (!period) return { period: null, rows: [] };
+            const rows = await supaFetch(
+              'balance_sheet_items',
+              `?property_id=eq.${encodeURIComponent(propId)}&period=eq.${period}&is_header=eq.false&is_total=eq.false&limit=500`
+            ).catch(() => []);
+            return { period, rows };
+          })(),
         ]);
-        cache = { rentRoll, events, cash: cash[0] || null, liabilities };
+        cache = {
+          rentRoll, events, liabilities,
+          cashOverride: cashOverride[0] || null,   // manual override (rarely used now)
+          bsLatest,                                  // { period, rows }
+        };
         fbCashForecastCache[propId] = cache;
       } catch (e) {
         body.innerHTML = `<div style="padding:24px;color:#c94646">Error loading forecast data: ${e.message}
@@ -4965,10 +5003,27 @@ You have your own phone number: +1 (866) 568-4445. You can send and search SMS m
       if (m > 12) { m = 1; y += 1; }
     }
 
+    // Derive starting cash from the latest balance sheet period.
+    // Operating cash  = sum of asset rows with account_section='cash'      (GL 10xx)
+    // Reserve cash    = sum of asset rows with account_section='escrow'    (GL 11xx)
+    // property_cash table still works as a MANUAL OVERRIDE if set.
+    let bsOperating = 0, bsReserve = 0;
+    const bsRows = (cache.bsLatest && cache.bsLatest.rows) || [];
+    bsRows.forEach(r => {
+      if (r.account_type !== 'asset') return;
+      const amt = Number(r.amount) || 0;
+      const section = (r.account_section || '').toLowerCase();
+      if (section === 'cash') bsOperating += amt;
+      else if (section === 'escrow') bsReserve += amt;
+    });
+
+    const override = cache.cashOverride;
     const starting = {
-      operating: Number(cache.cash && cache.cash.operating_cash) || 0,
-      reserve:   Number(cache.cash && cache.cash.reserve_cash) || 0,
-      threshold: Number(cache.cash && cache.cash.min_reserve_threshold) || 0,
+      operating: (override && override.operating_cash != null) ? Number(override.operating_cash) : bsOperating,
+      reserve:   (override && override.reserve_cash   != null) ? Number(override.reserve_cash)   : bsReserve,
+      threshold: (override && override.min_reserve_threshold)  ? Number(override.min_reserve_threshold) : 0,
+      bsPeriod:  cache.bsLatest && cache.bsLatest.period || null,
+      fromOverride: !!override,
     };
     starting.total = starting.operating + starting.reserve;
 
@@ -5152,7 +5207,10 @@ You have your own phone number: +1 (866) 568-4445. You can send and search SMS m
 
     // Missing-data warnings
     const hints = [];
-    if (!cache.cash) hints.push('No starting cash set — edit via the assumptions panel (when wired up).');
+    const hasBsCash = (cache.bsLatest && (cache.bsLatest.rows || []).length > 0);
+    if (!hasBsCash && !cache.cashOverride) {
+      hints.push('No balance sheet loaded — starting cash is $0. Run <code>sync_balance_sheets.py --commit</code> to pull in operating + reserve cash.');
+    }
     if (!(cache.rentRoll || []).length) hints.push('No rent roll loaded — run <code>sync_rent_rolls.py</code>.');
     if (!(cache.liabilities || []).length) hints.push('No liabilities matched to this property — check <code>exec_liabilities</code> <code>related_deal</code> field.');
     if (hints.length) {
@@ -5386,6 +5444,19 @@ You have your own phone number: +1 (866) 568-4445. You can send and search SMS m
     const hasDraws = (fbReserveDraws[baseProp.id] || []).length > 0;
     const hasEvents = (cache.events || []).length > 0;
 
+    const bsPeriod = fc.starting.bsPeriod;
+    const bsPeriodLabel = bsPeriod ? (() => {
+      const m = /^(\d{4})-(\d{2})$/.exec(bsPeriod);
+      if (!m) return bsPeriod;
+      const names = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+      return `${names[parseInt(m[2]) - 1]} ${m[1]}`;
+    })() : null;
+    const sourceNote = fc.starting.fromOverride
+      ? `<span style="color:var(--amber);font-size:10px">manual override</span>`
+      : (bsPeriodLabel
+         ? `<span style="color:var(--green);font-size:10px">from ${bsPeriodLabel} balance sheet</span>`
+         : `<span style="color:#c94646;font-size:10px">no BS loaded</span>`);
+
     return `<div class="fb-chart-card" style="padding:18px">
       <h3 style="font-size:11px;text-transform:uppercase;letter-spacing:.5px;color:var(--text-dim);margin-bottom:10px;font-weight:700">Forecast Assumptions</h3>
 
@@ -5396,7 +5467,8 @@ You have your own phone number: +1 (866) 568-4445. You can send and search SMS m
       <div style="padding:6px 0;font-size:12px;display:flex;justify-content:space-between;">
         <span>Reserve cash</span><span style="font-variant-numeric:tabular-nums">${fmtK(fc.starting.reserve)}</span>
       </div>
-      <button onclick="fbEditPropertyCash('${baseProp.id}')" style="width:100%;margin-top:8px;padding:6px;background:var(--surface2);color:var(--text);border:1px solid var(--border);border-radius:5px;font-size:11px;cursor:pointer">Edit cash position</button>
+      <div style="margin-top:6px;font-size:11px;color:var(--text-dim)">Source: ${sourceNote}</div>
+      <button onclick="fbEditPropertyCash('${baseProp.id}')" style="width:100%;margin-top:8px;padding:6px;background:var(--surface2);color:var(--text);border:1px solid var(--border);border-radius:5px;font-size:11px;cursor:pointer">${fc.starting.fromOverride ? 'Edit override' : 'Set manual override'}</button>
 
       <div style="margin-top:14px"><h3 style="font-size:10.5px;text-transform:uppercase;color:var(--text-dim);margin-bottom:6px">Data Sources</h3></div>
       <div style="padding:6px 0;font-size:12px;display:flex;justify-content:space-between;border-bottom:1px dashed var(--border)">

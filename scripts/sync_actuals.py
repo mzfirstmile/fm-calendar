@@ -1066,10 +1066,15 @@ def discover_files_grouped(
                      or only_property.lower() in child.name.lower()]
             if not stmts:
                 continue
-        # Pick the single most-recently-modified file per property. Older
-        # files (prior months, Q2 2025, etc.) would all try to download
-        # from Dropbox's Files On Demand and waste a lot of time.
-        stmts.sort(key=lambda p: os.path.getmtime(p), reverse=True)
+        # Pick the file with the NEWEST period (not newest mtime). Mtime
+        # can be misleading if you re-download an older file. We prefer
+        # filenames with a parseable (year, month), newest period winning.
+        def _sort_key(p):
+            period = parse_period_from_name(p.name)
+            if period:
+                return (1, period[0], period[1], os.path.getmtime(p))
+            return (0, 0, 0, os.path.getmtime(p))
+        stmts.sort(key=_sort_key, reverse=True)
         latest = stmts[0]
         print(f"  ✓ {child.name}: using latest → {latest.name}  ({len(stmts)} total found)")
         grouped[child.name] = [latest]

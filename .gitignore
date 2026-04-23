@@ -6,3 +6,6 @@ budgets/
 reports/
 Bank Transactions Batch Upload/
 data/2026 Budget/
+data/prospective_scan.json
+--commit
+.~lock.*
