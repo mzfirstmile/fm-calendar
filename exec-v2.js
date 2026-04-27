@@ -79,7 +79,7 @@ function _injectCSS() {
   .summary-section-title { font-size:11px; font-weight:700; color:var(--text-dim); text-transform:uppercase; letter-spacing:1px; }
   .summary-section-line { flex:1; height:1px; background:var(--border); }
   .summary-grid { display:grid; grid-template-columns:repeat(3,1fr); gap:12px; }
-  .summary-grid.cf-grid { grid-template-columns:repeat(6,1fr); }
+  .summary-grid.cf-grid { grid-template-columns:repeat(5,1fr); }
   .summary-card { background:var(--surface); border:1px solid var(--border); border-radius:12px; padding:18px 12px; text-align:center; position:relative; transition:box-shadow .15s; }
   .summary-card:hover { box-shadow:0 2px 8px rgba(0,0,0,0.06); }
   .summary-card .value { font-size:22px; font-weight:700; margin-bottom:4px; }
@@ -562,9 +562,8 @@ function _injectHTML() {
     <div class="summary-grid cf-grid">
       <div class="summary-card"><div class="value orange" id="totalDistros">—</div><div class="label">Owner Distros</div></div>
       <div class="summary-card"><div class="value orange" id="totalInvest">—</div><div class="label">Investments</div></div>
-      <div class="summary-card"><div class="value orange" id="totalLoans">—</div><div class="label">Loans Out</div></div>
-      <div class="summary-card"><div class="value orange" id="totalDeposits">—</div><div class="label">Deposits</div></div>
-      <div class="summary-card"><div class="value green" id="totalLoanPaybacks">—</div><div class="label">Loan Paybacks</div><span class="cf-operator">=</span></div>
+      <div class="summary-card"><div class="value orange" id="totalLoansNet">—</div><div class="label">Loans</div></div>
+      <div class="summary-card"><div class="value orange" id="totalDeposits">—</div><div class="label">Deposits</div><span class="cf-operator">=</span></div>
       <div class="summary-card highlight"><div class="value" id="cashFlow">—</div><div class="label">Cash Flow</div></div>
     </div>
   </div>
@@ -1534,9 +1533,9 @@ function renderPeriodDashboard() {
   };
   setCfBox('totalDistros', comp.totalDistributions);
   setCfBox('totalInvest', comp.totalInvestments);
-  setCfBox('totalLoans', comp.totalLoans);
+  // Loans card consolidates Loans Out + Loan Paybacks — net signed value (negative = net out, positive = net in)
+  setCfBox('totalLoansNet', comp.totalLoans + comp.totalLoanPaybacks);
   setCfBox('totalDeposits', comp.totalDeposits);
-  setCfBox('totalLoanPaybacks', comp.totalLoanPaybacks);
 
   const cfEl = document.getElementById('cashFlow');
   cfEl.textContent = fmt(comp.cashFlow);
