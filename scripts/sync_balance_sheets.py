@@ -125,6 +125,14 @@ def bs_section(bs_code: str) -> tuple[str, str]:
 
     if c < 2000:
         atype = "asset"
+        # Ranges follow the NAME_TO_BS_CODE allocation:
+        #   1000-1099: cash         1100-1199: escrow
+        #   1200-1299: A/R          1300-1399: prepaid / other current assets
+        #   1400-1599: fixed assets / property (1400 hdr, 1410 land, 1420
+        #              buildings, 1440 bldg improv, 1441 TI, 1450 F&F,
+        #              1480 AD, 1490 total)
+        #   1600-1899: other assets (1610 util dep, 1650 loan costs, 1667 DLC)
+        #   1900-1999: total assets (1990)
         if c < 1100:
             sect = "cash"
         elif c < 1200:
@@ -133,26 +141,34 @@ def bs_section(bs_code: str) -> tuple[str, str]:
             sect = "accounts_receivable"
         elif c < 1400:
             sect = "prepaid"
-        elif c < 1500:
-            sect = "other_current_assets"
-        elif c < 1900:
+        elif c < 1600:
             sect = "fixed_assets"
-        elif c < 2000:
+        elif c < 1900:
             sect = "other_assets"
         else:
             sect = "asset_other"
     elif c < 3000:
         atype = "liability"
+        # Ranges match the Yardi GL allocation in NAME_TO_BS_CODE:
+        #   2000-2099: accounts payable (2002 AP, 2020 prepaid rent, 2050 tenant
+        #              deposits, 2070 due to/from, 2090 total)
+        #   2100-2199: accrued liabilities (2100 hdr, 2130 mortgage interest,
+        #              2150 accrued expenses, 2190 total)
+        #   2300-2399: tenant / sales-tax accruals (2310 sales tax)
+        #   2400-2499: short-term liabilities (2450, 2451, 2499 total)
+        #   2500-2599: LONG TERM DEBT — mortgage payable etc. (2500 hdr,
+        #              2510 mortgage, 2590 total)  ← critical for 61 S Paramus
+        #   2900-2999: total liabilities (2990)
         if c < 2100:
             sect = "accounts_payable"
-        elif c < 2200:
-            sect = "long_term_debt"
         elif c < 2300:
             sect = "accrued_liabilities"
         elif c < 2400:
             sect = "tenant_deposits"
         elif c < 2500:
-            sect = "deferred_revenue"
+            sect = "other_liabilities"
+        elif c < 2900:
+            sect = "long_term_debt"
         else:
             sect = "other_liabilities"
     else:
@@ -556,6 +572,30 @@ def parse_balance_sheet(path: Path) -> dict[str, Any]:
             break
 
     if header_row_idx is None:
+        # Fallback: explicit "Account / Balance" header row not found
+        # (e.g. Morris's GL-coded files only have GL codes + names + amount,
+        # no header text). Find the first row whose col 0 is a 4-digit GL
+        # and treat the previous row as the header. Pick the amount column
+        # by scanning that row right-to-left for the first numeric cell.
+        for i, row in enumerate(all_rows):
+            if not row or row[0] is None:
+                continue
+            c0 = str(row[0]).strip()
+            if re.match(r"^\d{4}(\b|[-.])", c0):
+                header_row_idx = max(0, i - 1)
+                if amount_col is None:
+                    for j in range(len(row) - 1, 1, -1):
+                        v = row[j]
+                        try:
+                            if v not in (None, "") and abs(float(v)) > 0:
+                                amount_col = j
+                                break
+                        except (TypeError, ValueError):
+                            continue
+                if amount_col is None:
+                    amount_col = len(row) - 1 if len(row) > 2 else 1
+                break
+    if header_row_idx is None:
         raise ValueError(f"Could not locate header row in {path.name}")
     if amount_col is None:
         amount_col = 1
@@ -581,35 +621,46 @@ def parse_balance_sheet(path: Path) -> dict[str, Any]:
 
     # Auto-detect format: does col 0 contain GL codes (4-digit numbers)?
     # If so, col 0 = GL, col 1 = account name, col amount_col = balance.
+    # Probe the entire data region (not just the first 30 rows) so that a
+    # file with many empty/zero rows up top still gets classified correctly.
     gl_in_col0 = False
     gl_probe = 0
-    for row in all_rows[header_row_idx + 1 : header_row_idx + 30]:
+    for row in all_rows[header_row_idx + 1 :]:
         if not row or row[0] is None:
             continue
         c0 = str(row[0]).strip()
-        if re.match(r"^\d{4}(-[\d]+)*(-[\d]+)*$", c0) or re.match(r"^\d{4}$", c0):
+        if re.match(r"^\d{4}(\b|[-.])", c0):
             gl_probe += 1
-            if gl_probe >= 3:
+            if gl_probe >= 2:
                 gl_in_col0 = True
                 break
-    # When GL codes are in col 0, the amount column may shift right — re-detect
+    # When GL codes are in col 0, infer a *default* amount column by scanning
+    # several GL rows (not just the first one) and picking the column most
+    # frequently populated with a non-zero number. We still re-scan per-row
+    # below — this is just a fallback for rows whose value happens to land in
+    # a different column.
     if gl_in_col0:
-        # Find first row that has a 4-digit GL and a numeric value
-        for row in all_rows[header_row_idx + 1 : header_row_idx + 40]:
+        col_hits: dict[int, int] = {}
+        scanned = 0
+        for row in all_rows[header_row_idx + 1 :]:
             if not row or row[0] is None:
                 continue
             c0 = str(row[0]).strip()
             if not re.match(r"^\d{4}", c0):
                 continue
+            scanned += 1
             for j in range(len(row) - 1, 1, -1):
                 v = row[j]
                 try:
                     if v not in (None, "") and abs(float(v)) > 0:
-                        amount_col = j
+                        col_hits[j] = col_hits.get(j, 0) + 1
                         break
                 except (TypeError, ValueError):
                     continue
-            break
+            if scanned >= 25:
+                break
+        if col_hits:
+            amount_col = max(col_hits.items(), key=lambda kv: (kv[1], kv[0]))[0]
 
     # ── Walk data rows with section context ─────────────────────────
     rows: list[dict[str, Any]] = []
@@ -638,6 +689,24 @@ def parse_balance_sheet(path: Path) -> dict[str, Any]:
                     continue
                 upper = name_stripped.upper()
                 amount_val = row[amount_col] if amount_col < len(row) else None
+                # If the default amount column is empty for this particular
+                # row, scan right-to-left for the first numeric cell. Yardi
+                # files sometimes shift balances one column over for liability
+                # vs. asset rows — without this, the mortgage line would be
+                # treated as a header and stored with amount 0.
+                def _is_numeric(v: Any) -> bool:
+                    try:
+                        if v in (None, ""):
+                            return False
+                        float(v)
+                        return True
+                    except (TypeError, ValueError):
+                        return False
+                if not _is_numeric(amount_val):
+                    for j in range(len(row) - 1, 1, -1):
+                        if _is_numeric(row[j]):
+                            amount_val = row[j]
+                            break
                 # Skip if no amount (header row)
                 if amount_val in (None, ""):
                     # Still record header-style rows (section titles)
@@ -951,6 +1020,17 @@ def main() -> int:
                 flag = "H" if r["is_header"] else ("T" if r["is_total"] else " ")
                 print(f"      [{flag}] {r['bs_code']:>6}  {r['account_name'][:40]:40s}  "
                       f"{r['account_type']:>9}  {r['amount']:>14,.2f}")
+
+        # Always summarize liability rows so a missing mortgage is obvious
+        liab_rows = [r for r in parsed["rows"] if r["account_type"] == "liability"]
+        if liab_rows:
+            print(f"  liabilities ({len(liab_rows)} rows):")
+            for r in liab_rows:
+                flag = "H" if r["is_header"] else ("T" if r["is_total"] else " ")
+                print(f"      [{flag}] {r['bs_code']:>6}  {r['account_name'][:40]:40s}  "
+                      f"{r['account_section']:>20}  {r['amount']:>14,.2f}")
+        else:
+            print("  ⚠ no liability rows parsed — check file format / GL codes")
 
         if args.commit:
             n = supabase_upsert(supabase_url, supabase_key, supa_id, parsed["period"], parsed["rows"])
