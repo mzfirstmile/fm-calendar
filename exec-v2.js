@@ -560,10 +560,10 @@ function _injectHTML() {
       <div class="summary-section-line"></div>
     </div>
     <div class="summary-grid cf-grid">
-      <div class="summary-card"><div class="value orange" id="totalDistros">—</div><div class="label">Owner Distros</div><span class="cf-operator">−</span></div>
-      <div class="summary-card"><div class="value orange" id="totalInvest">—</div><div class="label">Investments</div><span class="cf-operator">−</span></div>
-      <div class="summary-card"><div class="value orange" id="totalLoans">—</div><div class="label">Loans Out</div><span class="cf-operator">−</span></div>
-      <div class="summary-card"><div class="value orange" id="totalDeposits">—</div><div class="label">Deposits</div><span class="cf-operator">+</span></div>
+      <div class="summary-card"><div class="value orange" id="totalDistros">—</div><div class="label">Owner Distros</div></div>
+      <div class="summary-card"><div class="value orange" id="totalInvest">—</div><div class="label">Investments</div></div>
+      <div class="summary-card"><div class="value orange" id="totalLoans">—</div><div class="label">Loans Out</div></div>
+      <div class="summary-card"><div class="value orange" id="totalDeposits">—</div><div class="label">Deposits</div></div>
       <div class="summary-card"><div class="value green" id="totalLoanPaybacks">—</div><div class="label">Loan Paybacks</div><span class="cf-operator">=</span></div>
       <div class="summary-card highlight"><div class="value" id="cashFlow">—</div><div class="label">Cash Flow</div></div>
     </div>
@@ -757,7 +757,8 @@ const CAT_ICONS = {
   'Loan Payback': '🏦',
   'Deposit': '🔒',
   'Marketing': '📣',
-  'Contractors': '🔨'
+  'Contractors': '🔨',
+  'Charity': '❤️'
 };
 
 // Grouped categories for the dropdown (with optgroup sections)
@@ -766,7 +767,7 @@ const CATEGORY_GROUPS = [
   { label: '📋 Expenses', items: [
     'Payroll', 'Finders Fee', 'Interest Expense', 'Legal/Corp Services',
     'Credit Cards', 'Other Operating', 'Marketing', 'Rent', 'Travel/Parking/Auto',
-    'Banking', 'Software/Services', 'Contractors', 'Taxes', 'Checks',
+    'Banking', 'Software/Services', 'Contractors', 'Charity', 'Taxes', 'Checks',
     'PM Expenses', 'Wire Payments'
   ]},
   { label: '📊 Balance Sheet', items: [
@@ -887,6 +888,7 @@ async function loadData() {
       if (r.reviewed) reviewedItems[r.id] = true;
       if (r.loan_start_date) loanStartDates[r.id] = r.loan_start_date;
       if (r.loan_maturity_date) loanMaturityDates[r.id] = r.loan_maturity_date;
+      if (r.payroll_split != null) payrollSplits[r.id] = parseFloat(r.payroll_split);
       return {
         id: r.id,
         fields: {
@@ -1340,8 +1342,8 @@ function computePeriod(records, period) {
 
   return {
     totalIncome, totalOpex: Math.abs(totalOpex), netOpex, payrollReimb, payrollSplitTotal,
-    totalDistributions: Math.abs(totalDistributions), totalInvestments: Math.abs(totalInvestments),
-    totalLoans: Math.abs(totalLoans), totalLoanPaybacks, totalDeposits: Math.abs(totalDeposits),
+    // Cash-flow buckets: raw signed values (positive = inflow, negative = outflow). Render dynamically.
+    totalDistributions, totalInvestments, totalLoans, totalLoanPaybacks, totalDeposits,
     netIncome, cashFlow,
     incomeBuckets, opexBuckets, distroBuckets, investBuckets, loanBuckets, loanPaybackBuckets, depositBuckets, excludedBuckets
   };
@@ -1521,12 +1523,20 @@ function renderPeriodDashboard() {
   niEl.textContent = fmt(comp.netIncome);
   niEl.className = 'value ' + (comp.netIncome >= 0 ? 'green' : 'red');
 
-  // Summary cards — Row 2
-  document.getElementById('totalDistros').textContent = comp.totalDistributions > 0 ? fmt(-comp.totalDistributions) : '—';
-  document.getElementById('totalInvest').textContent = comp.totalInvestments > 0 ? fmt(-comp.totalInvestments) : '—';
-  document.getElementById('totalLoans').textContent = comp.totalLoans > 0 ? fmt(-comp.totalLoans) : '—';
-  document.getElementById('totalDeposits').textContent = comp.totalDeposits > 0 ? fmt(-comp.totalDeposits) : '—';
-  document.getElementById('totalLoanPaybacks').textContent = comp.totalLoanPaybacks > 0 ? fmt(comp.totalLoanPaybacks) : '—';
+  // Summary cards — Row 2 (cash flow)
+  // Each box renders the raw signed value with sign + color reflecting credit (inflow=+/green) vs debit (outflow=-/orange)
+  const setCfBox = (id, val) => {
+    const el = document.getElementById(id);
+    if (!el) return;
+    if (!val || val === 0) { el.textContent = '—'; el.className = 'value'; return; }
+    el.textContent = (val > 0 ? '+' : '') + fmt(val);
+    el.className = 'value ' + (val > 0 ? 'green' : 'orange');
+  };
+  setCfBox('totalDistros', comp.totalDistributions);
+  setCfBox('totalInvest', comp.totalInvestments);
+  setCfBox('totalLoans', comp.totalLoans);
+  setCfBox('totalDeposits', comp.totalDeposits);
+  setCfBox('totalLoanPaybacks', comp.totalLoanPaybacks);
 
   const cfEl = document.getElementById('cashFlow');
   cfEl.textContent = fmt(comp.cashFlow);
@@ -1725,24 +1735,25 @@ function renderInvestmentRows(containerId, buckets, total) {
 function renderBsItems(comp) {
   const container = document.getElementById('bsItemsRows');
   const items = [];
-  if (comp.totalDistributions > 0) {
+  // Use absolute magnitudes for bar widths; gate inclusion on any activity (in or out)
+  if (comp.totalDistributions !== 0) {
     const count = Object.values(comp.distroBuckets).reduce((s, b) => s + b.count, 0);
-    items.push({ label: 'Owner Distributions', icon: '💸', amount: comp.totalDistributions, count, drillType: 'Owner Distributions', cssClass: 'expense' });
+    items.push({ label: 'Owner Distributions', icon: '💸', amount: Math.abs(comp.totalDistributions), count, drillType: 'Owner Distributions', cssClass: comp.totalDistributions > 0 ? 'income' : 'expense' });
   }
-  if (comp.totalInvestments > 0) {
+  if (comp.totalInvestments !== 0) {
     const count = Object.values(comp.investBuckets).reduce((s, b) => s + b.count, 0);
-    items.push({ label: 'Investment Contributions', icon: '🏗️', amount: comp.totalInvestments, count, drillType: 'Investment Contributions', cssClass: 'expense' });
+    items.push({ label: 'Investment Contributions', icon: '🏗️', amount: Math.abs(comp.totalInvestments), count, drillType: 'Investment Contributions', cssClass: comp.totalInvestments > 0 ? 'income' : 'expense' });
   }
-  if (comp.totalLoans > 0) {
+  if (comp.totalLoans !== 0) {
     const count = Object.values(comp.loanBuckets).reduce((s, b) => s + b.count, 0);
-    items.push({ label: 'Loans Out', icon: '🏦', amount: comp.totalLoans, count, drillType: 'Loan Out', cssClass: 'expense' });
+    items.push({ label: 'Loans Out', icon: '🏦', amount: Math.abs(comp.totalLoans), count, drillType: 'Loan Out', cssClass: comp.totalLoans > 0 ? 'income' : 'expense' });
   }
-  if (comp.totalDeposits > 0) {
+  if (comp.totalDeposits !== 0) {
     const count = Object.values(comp.depositBuckets).reduce((s, b) => s + b.count, 0);
-    items.push({ label: 'Deposits', icon: '🔒', amount: comp.totalDeposits, count, drillType: 'Deposit', cssClass: 'expense' });
+    items.push({ label: 'Deposits', icon: '🔒', amount: Math.abs(comp.totalDeposits), count, drillType: 'Deposit', cssClass: comp.totalDeposits > 0 ? 'income' : 'expense' });
   }
-  if (comp.totalLoanPaybacks > 0) {
-    items.push({ label: 'Loan Paybacks', icon: '↩️', amount: comp.totalLoanPaybacks, count: Object.values(comp.loanPaybackBuckets).reduce((s, b) => s + b.count, 0), drillType: 'Loan Payback', cssClass: 'income' });
+  if (comp.totalLoanPaybacks !== 0) {
+    items.push({ label: 'Loan Paybacks', icon: '↩️', amount: Math.abs(comp.totalLoanPaybacks), count: Object.values(comp.loanPaybackBuckets).reduce((s, b) => s + b.count, 0), drillType: 'Loan Payback', cssClass: comp.totalLoanPaybacks > 0 ? 'income' : 'expense' });
   }
   const maxVal = items.length > 0 ? Math.max(...items.map(i => i.amount)) : 1;
   const totalAll = items.reduce((s, i) => s + i.amount, 0);
@@ -1950,6 +1961,17 @@ function openDrilldown(type, cssClass) {
         const isLinkableIncome = linkableIncomeTypes.includes(d.currentType);
         const isInvestmentIncome = d.currentType === 'Investment Income';
         const isInterestExpense = d.currentType === 'Interest Expense';
+        const isPmFeeIncome = d.currentType === 'Property Management Fee Income';
+
+        // Payroll-split chip for PM Fee rows
+        let splitHtml = '';
+        if (isPmFeeIncome && d.recordId) {
+          const curSplit = payrollSplits[d.recordId] || 0;
+          const label = curSplit > 0 ? `✂️ ${fmt(curSplit)}` : '✂️ Split payroll';
+          const bg = curSplit > 0 ? 'var(--accent-bg, var(--surface2))' : 'var(--surface2)';
+          const color = curSplit > 0 ? 'var(--accent)' : 'var(--text)';
+          splitHtml = `<button onclick="setPayrollSplit('${d.recordId}')" title="Split out a payroll-reimbursement portion of this deposit" style="cursor:pointer;font-size:10px;border:1px solid var(--border);background:${bg};color:${color};border-radius:6px;padding:4px 8px;max-width:130px;white-space:nowrap;">${label}</button>`;
+        }
 
         let linkHtml = '';
         if (isLinkableIncome && d.recordId) {
@@ -1987,10 +2009,11 @@ function openDrilldown(type, cssClass) {
         }
 
         html += `
-          <div class="txn-row"${linkHtml ? ' style="flex-wrap:wrap;"' : ''}>
+          <div class="txn-row"${(linkHtml || splitHtml) ? ' style="flex-wrap:wrap;"' : ''}>
             <div class="txn-desc">${d.desc}<span class="txn-tooltip">${d.desc}</span></div>
             <div class="txn-acct">${d.acct}</div>
             ${linkHtml}
+            ${splitHtml}
             <select class="txn-cat-select" onchange="changeCategory('${d.recordId}', this.value)">
               ${buildCategoryOptions(d.currentType)}
             </select>
@@ -2077,6 +2100,33 @@ async function changeCategory(recordId, newCategory) {
   } catch(e) {
     console.error('Failed to save override:', e);
     showToast(`⚠️ Save failed: ${e.message}`, 'error');
+  }
+}
+
+async function setPayrollSplit(recordId) {
+  const current = payrollSplits[recordId] || 0;
+  const msg = current > 0
+    ? `Payroll reimbursement portion of this PM fee deposit.\n\nCurrent: ${fmtFull(current)}\nEnter new amount (or 0 to clear):`
+    : `Payroll reimbursement portion of this PM fee deposit.\n\nEnter amount:`;
+  const input = prompt(msg, current > 0 ? String(current) : '');
+  if (input === null) return; // cancelled
+  const amt = parseFloat(input);
+  if (isNaN(amt) || amt < 0) { showToast('Invalid amount', 'error'); return; }
+  // Update local state
+  if (amt > 0) payrollSplits[recordId] = amt; else delete payrollSplits[recordId];
+  // Persist (store 0 for cleared so legacy hardcoded list doesn't re-apply on reload)
+  try {
+    await supaWrite('exec_transactions', 'PATCH', { payroll_split: amt }, `?id=eq.${recordId}`);
+    showToast(amt > 0 ? `Payroll split → ${fmtFull(amt)}` : 'Payroll split cleared');
+  } catch(e) {
+    console.error('Failed to save payroll split:', e);
+    showToast(`⚠️ Save failed: ${e.message}`, 'error');
+    return;
+  }
+  // Re-render drilldown if open + dashboard so net PM fee updates
+  renderPeriodDashboard();
+  if (typeof currentDrilldownType !== 'undefined' && currentDrilldownType) {
+    openDrilldown(currentDrilldownType, currentDrilldownCssClass);
   }
 }
 
@@ -2696,6 +2746,17 @@ function renderUploadTxnRow(t) {
   }
 
   const isChecked = uploadReviewChoices[t.idx]?.userApproved ? 'checked' : '';
+
+  // Payroll-split chip for PM Fee rows in upload review
+  let uploadSplitHtml = '';
+  if (t.type === 'Property Management Fee Income') {
+    const curSplit = uploadReviewChoices[t.idx]?.payroll_split || 0;
+    const label = curSplit > 0 ? `✂️ ${fmt(curSplit)}` : '✂️ Split payroll';
+    const bg = curSplit > 0 ? 'var(--accent-bg, var(--surface2))' : 'var(--surface2)';
+    const color = curSplit > 0 ? 'var(--accent)' : 'var(--text)';
+    uploadSplitHtml = `<button onclick="uploadSetPayrollSplit(${t.idx})" title="Split out a payroll-reimbursement portion of this deposit" style="cursor:pointer;font-size:10px;border:1px solid var(--border);background:${bg};color:${color};border-radius:6px;padding:4px 8px;max-width:130px;white-space:nowrap;">${label}</button>`;
+  }
+
   return `<div class="upload-txn-row" data-idx="${t.idx}" style="position:relative;">
     <label class="upload-approve-check" title="Mark as reviewed" style="display:flex;align-items:center;justify-content:center;min-width:28px;cursor:pointer;">
       <input type="checkbox" ${isChecked} onchange="uploadApproveItem(${t.idx}, this.checked)" style="width:16px;height:16px;cursor:pointer;accent-color:var(--accent);">
@@ -2709,8 +2770,31 @@ function renderUploadTxnRow(t) {
       ${buildCategoryOptions(t.type)}
     </select>
     ${linkDropdownHtml}
+    ${uploadSplitHtml}
     <div class="txn-amount ${amtClass}">${amtStr}</div>
   </div>`;
+}
+
+function uploadSetPayrollSplit(idx) {
+  const choice = uploadReviewChoices[idx] || {};
+  const current = choice.payroll_split || 0;
+  const msg = current > 0
+    ? `Payroll reimbursement portion of this PM fee deposit.\n\nCurrent: ${fmtFull(current)}\nEnter new amount (or 0 to clear):`
+    : `Payroll reimbursement portion of this PM fee deposit.\n\nEnter amount:`;
+  const input = prompt(msg, current > 0 ? String(current) : '');
+  if (input === null) return;
+  const amt = parseFloat(input);
+  if (isNaN(amt) || amt < 0) { showToast('Invalid amount', 'error'); return; }
+  uploadReviewChoices[idx] = { ...(uploadReviewChoices[idx] || {}), payroll_split: amt > 0 ? amt : null, userModified: true, userApproved: true };
+  // Re-render this single row in place
+  const rowEl = document.querySelector(`.upload-txn-row[data-idx="${idx}"]`);
+  if (rowEl) {
+    const txn = uploadStagedTxns[idx];
+    const c = uploadReviewChoices[idx];
+    const result = { ...txn, idx, type: c.category, property_id: c.property_id, investment_id: c.investment_id, liability_id: c.liability_id };
+    rowEl.outerHTML = renderUploadTxnRow(result);
+  }
+  showToast(amt > 0 ? `Split → ${fmtFull(amt)}` : 'Split cleared');
 }
 
 function uploadApproveItem(idx, checked) {
@@ -2826,6 +2910,7 @@ async function confirmImport() {
     row.property_id = choice.property_id || null;
     row.liability_id = choice.liability_id || null;
     row.category_name = null;
+    row.payroll_split = choice.payroll_split || null;
     // Mark as reviewed if: high confidence, user changed category, or user explicitly approved
     row.reviewed = (choice.confidence === 'high' || choice.userModified || choice.userApproved) ? true : false;
     return row;
