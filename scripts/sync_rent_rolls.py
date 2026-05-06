@@ -260,9 +260,248 @@ def read_supabase_config() -> tuple[str, str]:
 
 
 # ─────────────────────────────────────────────────────────────────────────
-# Parser
+# Parser — Yardi "charge-line" format
+# Each tenant is a block with one row per charge code (rent-com, CAM-EST, …)
+# and one row per unit. Header row contains "Charge Code" + "Lease From" +
+# "Monthly Amount". Tenant name lives in the "Lease" column on the first row
+# of each block; subsequent rows leave that column blank. Block ends with a
+# row whose first column reads "Total".
 # ─────────────────────────────────────────────────────────────────────────
-def parse_rent_roll(path: Path) -> dict[str, Any]:
+def parse_yardi_charge_format(path: Path, verbose: bool = False):
+    wb = openpyxl.load_workbook(path, data_only=True)
+    ws = wb.active
+    all_rows = list(ws.iter_rows(values_only=True))
+
+    # Locate "as of" date (e.g. row 2 = "As of Date: 2/28/2026")
+    as_of_d: date | None = None
+    for r in all_rows[:8]:
+        if not r:
+            continue
+        for c in r:
+            if c is None:
+                continue
+            s = str(c).strip()
+            m = re.search(r"as of(?:\s*date)?:?\s*(\d{1,2}/\d{1,2}/\d{2,4})",
+                          s, re.IGNORECASE)
+            if m:
+                for fmt in ("%m/%d/%Y", "%m/%d/%y"):
+                    try:
+                        as_of_d = datetime.strptime(m.group(1), fmt).date()
+                        break
+                    except ValueError:
+                        continue
+            if as_of_d:
+                break
+        if as_of_d:
+            break
+
+    # Locate header row
+    header_idx = None
+    for i, row in enumerate(all_rows[:15]):
+        if not row:
+            continue
+        normed = " | ".join(norm_header(c) for c in row)
+        if "charge code" in normed and "lease from" in normed and "monthly amount" in normed:
+            header_idx = i
+            break
+    if header_idx is None:
+        return None  # not in this format
+
+    headers = [norm_header(c) for c in all_rows[header_idx]]
+
+    def find_col(name: str, occurrence: int = 0):
+        n = norm_header(name)
+        found = 0
+        for i, h in enumerate(headers):
+            if h == n:
+                if found == occurrence:
+                    return i
+                found += 1
+        return None
+
+    col_units_a    = find_col("unit(s)", 0)
+    col_lease      = find_col("lease", 0)
+    col_lease_from = find_col("lease from")
+    col_lease_to   = find_col("lease to")
+    col_units_i    = find_col("unit(s)", 1) or col_units_a
+    col_area       = find_col("area")
+    col_charge     = find_col("charge code")
+    col_chg_from   = find_col("charge from")
+    col_chg_to     = find_col("charge to")
+    col_monthly    = find_col("monthly amount")
+    col_annualized = find_col("annualized gross amount")
+
+    def cell(row, idx):
+        if idx is None or idx >= len(row):
+            return None
+        return row[idx]
+
+    def to_dt(v: Any):
+        if v is None or v == "":
+            return None
+        if isinstance(v, datetime):
+            return v.date()
+        if isinstance(v, date):
+            return v
+        for fmt in ("%Y-%m-%d", "%m/%d/%Y", "%m/%d/%y"):
+            try:
+                return datetime.strptime(str(v).strip()[:10], fmt).date()
+            except ValueError:
+                continue
+        return None
+
+    def is_active(cf, ct) -> bool:
+        if not as_of_d:
+            return True
+        cfd = to_dt(cf)
+        ctd = to_dt(ct)
+        if cfd and as_of_d < cfd:
+            return False
+        if ctd and as_of_d > ctd:
+            return False
+        return True
+
+    suites: dict[tuple[str, str], dict[str, Any]] = {}
+    current_tenant: str | None = None
+    current_ls: str | None = None
+    current_le: str | None = None
+
+    for row in all_rows[header_idx + 1:]:
+        if not row or all(c is None or str(c).strip() == "" for c in row):
+            continue
+        a = cell(row, col_units_a)
+        b = cell(row, col_lease)
+        a_str = str(a).strip() if a is not None else ""
+        b_str = str(b).strip() if b is not None else ""
+
+        if a_str.lower() in ("total", "subtotal", "grand total"):
+            current_tenant = None
+            continue
+
+        if b_str:
+            current_tenant = b_str
+            current_ls = to_date(cell(row, col_lease_from))
+            current_le = to_date(cell(row, col_lease_to))
+
+        if not current_tenant:
+            continue
+
+        unit_raw = cell(row, col_units_i)
+        unit_str = str(unit_raw).strip() if unit_raw is not None else ""
+        if not unit_str:
+            continue
+
+        area = to_num(cell(row, col_area))
+        charge = cell(row, col_charge)
+        charge_str = str(charge).strip() if charge is not None else ""
+        if not charge_str:
+            continue
+
+        cf = cell(row, col_chg_from)
+        ct = cell(row, col_chg_to)
+        monthly = to_num(cell(row, col_monthly)) or 0.0
+        annual = to_num(cell(row, col_annualized)) or (monthly * 12)
+        active = is_active(cf, ct)
+
+        key = (current_tenant, unit_str)
+        s = suites.setdefault(key, {
+            "tenant_name": current_tenant,
+            "suite": unit_str,
+            "status": "Current",
+            "sf": area,
+            "lease_start": current_ls,
+            "lease_end": current_le,
+            "monthly_rent": 0.0,
+            "annual_rent": 0.0,
+            "cam_reimbursement": None,
+            "re_tax_reimbursement": None,
+            "insurance_reimbursement": None,
+            "_other": [],
+        })
+        if not s.get("sf") and area:
+            s["sf"] = area
+        if not s.get("lease_start") and current_ls:
+            s["lease_start"] = current_ls
+        if not s.get("lease_end") and current_le:
+            s["lease_end"] = current_le
+
+        if not active:
+            continue
+        cc = charge_str.lower()
+        if any(k in cc for k in ("rent-com", "rent com", "base rent")) or (
+            cc.startswith("rent") and not any(k in cc for k in ("free", "abate", "concession"))
+        ):
+            s["monthly_rent"] += monthly
+            s["annual_rent"] += annual
+        elif "cam" in cc or cc.startswith("oe") or "operating expense" in cc:
+            lbl = f"{charge_str}: ${monthly:,.0f}/mo"
+            s["cam_reimbursement"] = (s["cam_reimbursement"] + "; " if s["cam_reimbursement"] else "") + lbl
+        elif "tax" in cc or cc == "ret":
+            lbl = f"{charge_str}: ${monthly:,.0f}/mo"
+            s["re_tax_reimbursement"] = (s["re_tax_reimbursement"] + "; " if s["re_tax_reimbursement"] else "") + lbl
+        elif "ins" in cc:
+            lbl = f"{charge_str}: ${monthly:,.0f}/mo"
+            s["insurance_reimbursement"] = (s["insurance_reimbursement"] + "; " if s["insurance_reimbursement"] else "") + lbl
+        else:
+            s["_other"].append(f"{charge_str}: ${monthly:,.0f}/mo")
+
+    rows_out: list[dict[str, Any]] = []
+    for (tenant, unit), s in suites.items():
+        status = "Current"
+        if as_of_d and s.get("lease_end"):
+            le = to_dt(s["lease_end"])
+            if le and as_of_d > le:
+                status = "Expired"
+        if as_of_d and s.get("lease_start"):
+            ls = to_dt(s["lease_start"])
+            if ls and as_of_d < ls:
+                status = "Pending"
+        rec = {
+            "tenant_name": s["tenant_name"],
+            "suite": s["suite"],
+            "status": status,
+            "sf": s.get("sf"),
+            "lease_start": s.get("lease_start"),
+            "lease_end": s.get("lease_end"),
+            "monthly_rent": round(s["monthly_rent"], 2) if s["monthly_rent"] else None,
+            "annual_rent": round(s["annual_rent"], 2) if s["annual_rent"] else None,
+            "cam_reimbursement": s.get("cam_reimbursement"),
+            "re_tax_reimbursement": s.get("re_tax_reimbursement"),
+            "insurance_reimbursement": s.get("insurance_reimbursement"),
+        }
+        if rec["annual_rent"] and rec.get("sf"):
+            try:
+                rec["rent_per_sf"] = round(rec["annual_rent"] / rec["sf"], 4)
+            except (ZeroDivisionError, TypeError):
+                pass
+        if s.get("_other"):
+            rec["notes"] = "; ".join(s["_other"])
+        rows_out.append(rec)
+
+    if verbose:
+        print(f"    yardi-charge-format: as_of={as_of_d}, suites={len(rows_out)}")
+
+    return {
+        "rows": rows_out,
+        "source_file": str(path),
+        "header_columns": ["yardi_charge_format"],
+        "as_of_date": as_of_d.isoformat() if as_of_d else None,
+    }
+
+
+# ─────────────────────────────────────────────────────────────────────────
+# Parser — generic / legacy table format (one row per tenant)
+# ─────────────────────────────────────────────────────────────────────────
+def parse_rent_roll(path: Path, verbose: bool = False) -> dict[str, Any]:
+    # Try the Yardi charge-line format first
+    try:
+        yardi = parse_yardi_charge_format(path, verbose=verbose)
+        if yardi is not None and yardi.get("rows"):
+            return yardi
+    except Exception as e:
+        if verbose:
+            print(f"    yardi parser exception: {e}")
+
     wb = openpyxl.load_workbook(path, data_only=True)
     ws = wb.active
     all_rows = list(ws.iter_rows(values_only=True))
@@ -325,10 +564,19 @@ def parse_rent_roll(path: Path) -> dict[str, Any]:
 
         out_rows.append(rec)
 
+    # Generic parser doesn't have an explicit "As of" header, so fall back
+    # to the file's modified-time as the snapshot date.
+    try:
+        mtime = datetime.fromtimestamp(path.stat().st_mtime).date()
+        as_of = mtime.isoformat()
+    except OSError:
+        as_of = None
+
     return {
         "rows": out_rows,
         "source_file": str(path),
         "header_columns": list(col_idx.keys()),
+        "as_of_date": as_of,
     }
 
 
@@ -346,7 +594,8 @@ def infer_property_id_from_folder(folder_name: str) -> str | None:
 # Supabase writer
 # ─────────────────────────────────────────────────────────────────────────
 def supabase_upsert(url: str, key: str, property_id: str,
-                    rows: list[dict[str, Any]], source_file: str) -> int:
+                    rows: list[dict[str, Any]], source_file: str,
+                    as_of_date: str | None = None) -> int:
     endpoint = f"{url}/rest/v1/rent_roll"
     headers = {
         "apikey": key,
@@ -365,11 +614,20 @@ def supabase_upsert(url: str, key: str, property_id: str,
     if not rows:
         return 0
 
+    # Normalize: PostgREST requires every row in a batch to have identical keys.
+    # Build the union of keys across all rows, then fill missing with None.
+    all_keys: set[str] = set()
+    for r in rows:
+        all_keys.update(r.keys())
+    all_keys.update({"property_id", "source_file", "as_of_date"})
+
     payload = []
     for r in rows:
-        rec = dict(r)
+        rec = {k: r.get(k) for k in all_keys}
         rec["property_id"] = property_id
         rec["source_file"] = source_file
+        if as_of_date is not None:
+            rec["as_of_date"] = as_of_date
         payload.append(rec)
 
     # Insert in chunks
@@ -464,14 +722,17 @@ def main() -> int:
             print(f"  ✓ materialized ({path.stat().st_size:,} bytes)")
 
         try:
-            parsed = parse_rent_roll(path)
+            parsed = parse_rent_roll(path, verbose=args.verbose)
         except Exception as e:
             print(f"  ✗ parse error: {e}")
             continue
 
         rows = parsed["rows"]
+        as_of_date = parsed.get("as_of_date")
         print(f"  parsed    : {len(rows)} tenant rows")
         print(f"  columns   : {', '.join(parsed['header_columns'])}")
+        if as_of_date:
+            print(f"  as of     : {as_of_date}")
 
         if args.verbose:
             for r in rows[:20]:
@@ -489,7 +750,8 @@ def main() -> int:
         print(f"  property  : {folder_name} → {supa_id}")
 
         if args.commit:
-            n = supabase_upsert(supabase_url, supabase_key, supa_id, rows, str(path))
+            n = supabase_upsert(supabase_url, supabase_key, supa_id, rows,
+                                str(path), as_of_date=as_of_date)
             total_inserted += n
             print(f"  ✓ upserted {n} rows")
         else:
